@@ -6,19 +6,25 @@ import java.io.*;
 import javax.comm.*;
 
 
-public class SerialPortChannel extends Channel implements SerialPortEventListener
+public class SerialPortChannel extends Channel
 {
 
-    public SerialPortChannel(CommPortIdentifier commPortIdentifier) {
+    private SerialPortChannel(CommPortIdentifier commPortIdentifier) {
         this.commPortIdentifier = commPortIdentifier;
     }
     
     
-    public static SerialPortChannel create(String portName) throws NoSuchPortException {
-        return new SerialPortChannel(CommPortIdentifier.getPortIdentifier(portName));
+    public static SerialPortChannel create(CommPortIdentifier commPortIdentifier) throws NoSuchPortException {
+        return new SerialPortChannel(commPortIdentifier);
     }
         
     
+    public static SerialPortChannel create(String portName) throws NoSuchPortException {
+        return create(CommPortIdentifier.getPortIdentifier(portName));
+    }
+        
+    
+    @Override
     public void open(String name) throws ChannelException {
         try {
             if (port == null) {
@@ -29,7 +35,7 @@ public class SerialPortChannel extends Channel implements SerialPortEventListene
                 SerialPort.DATABITS_8, 
                 SerialPort.STOPBITS_1, 
                 SerialPort.PARITY_NONE);
-            port.addEventListener(this);
+            port.addEventListener(new Receiver());
             port.notifyOnDataAvailable(true);
             inputStream = port.getInputStream();
             outputStream = port.getOutputStream();
@@ -64,7 +70,8 @@ public class SerialPortChannel extends Channel implements SerialPortEventListene
     }
     
     
-    public void close() {
+    @Override
+    public void close() throws ChannelException {
         if (port != null) {
             port.removeEventListener();
             port.close();
@@ -76,6 +83,7 @@ public class SerialPortChannel extends Channel implements SerialPortEventListene
     }
     
     
+    @Override
     public synchronized void send(byte[] bytes) {
         try {
             outputStream.write(bytes);
@@ -86,19 +94,7 @@ public class SerialPortChannel extends Channel implements SerialPortEventListene
     }
     
     
-    public void serialEvent(SerialPortEvent ev) {
-        try {
-            int available = inputStream.available();
-    	    byte[] received = new byte[available];
-            inputStream.read(received, 0, available);
-            notifyListeners(received);
-	}
-	catch (IOException e) {
-            notifyListeners(e);
-        }
-    }
-    
-    
+    @Override
     public String toString() {
         return commPortIdentifier.getName();
     }
@@ -114,6 +110,24 @@ public class SerialPortChannel extends Channel implements SerialPortEventListene
             }
         }
         return all;
+    }
+    
+    
+    private class Receiver implements SerialPortEventListener {
+
+        @Override
+        public void serialEvent(SerialPortEvent evt) {
+            try {
+                int available = inputStream.available();
+                byte[] received = new byte[available];
+                inputStream.read(received, 0, available);
+                notifyListeners(received);
+            }
+            catch (IOException ex) {
+                notifyListeners(ex);
+            }
+        }
+        
     }
 
 

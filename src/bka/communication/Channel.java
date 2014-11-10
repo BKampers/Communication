@@ -30,7 +30,7 @@ public abstract class Channel
     }
 
     
-    public void close() {
+    public void close() throws ChannelException {
         listeners.removeAllElements();
     }
 

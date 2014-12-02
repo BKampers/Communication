@@ -60,6 +60,16 @@ public class SocketChannel extends Channel {
     }
     
     
+    public String getHost() {
+        return host;
+    }
+    
+    
+    public int getPort() {
+        return port;
+    }
+    
+    
     @Override
     public String toString() {
         return host;

@@ -14,7 +14,7 @@ public class SerialPortChannel extends Channel
     }
     
     
-    public static SerialPortChannel create(CommPortIdentifier commPortIdentifier) throws NoSuchPortException {
+    public static SerialPortChannel create(CommPortIdentifier commPortIdentifier) {
         return new SerialPortChannel(commPortIdentifier);
     }
         

@@ -205,34 +205,21 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
 
 
     void openMenuItem_ActionPerformed(java.awt.event.ActionEvent event) {
-        openMenuItem_ActionPerformed_Interaction1(event);
-    }
-
-
-    void openMenuItem_ActionPerformed_Interaction1(java.awt.event.ActionEvent event) {
-       // try {
-            // OpenFileDialog Create and show as modal
-            JFileChooser fileChooser = new JFileChooser();
-            fileChooser.setFileFilter(new TextFileFilter());
-            fileChooser.setVisible(true);
-            File file = fileChooser.getSelectedFile();
-            if (file.exists()) {
-                try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r")) {
-                    String text;
-                    do {
-                        text = randomAccessFile.readLine();
-                        if (text != null) {
-                            transmitText(text);
-                        }
-                    } while (text != null);
-                }
-                catch (IOException ex) {
-                    Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "openMenuItem_ActionPerformed", ex);
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setFileFilter(new TextFileFilter());
+        fileChooser.showOpenDialog(this);
+        File file = fileChooser.getSelectedFile();
+        if (file.exists()) {
+            try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r")) {
+                String text;
+                while ((text = randomAccessFile.readLine()) != null) {
+                    transmitText(text);
                 }
             }
-//        } catch (Exception e) {
-//            System.out.println(e);
-//        }
+            catch (IOException ex) {
+                Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "openMenuItem_ActionPerformed", ex);
+            }
+        }
     }
 
 
@@ -352,14 +339,16 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
         fileChooser.setDialogType(JFileChooser.SAVE_DIALOG);
         fileChooser.setCurrentDirectory(defDirectory);
         fileChooser.setFileFilter(new TextFileFilter());
-        fileChooser.setVisible(true);
+        fileChooser.showSaveDialog(this);
         File file = fileChooser.getSelectedFile();
-        try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw")) {
-            randomAccessFile.writeBytes(receivedText.getText());
-            randomAccessFile.close();
-        }
-        catch (Exception ex) {
-            Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "saveMenuItem_ActionPerformed", ex);
+        if (file != null) {
+            try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw")) {
+                randomAccessFile.writeBytes(receivedText.getText());
+                randomAccessFile.close();
+            }
+            catch (Exception ex) {
+                Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "saveMenuItem_ActionPerformed", ex);
+            }
         }
     }
 

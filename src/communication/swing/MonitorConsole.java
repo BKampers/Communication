@@ -6,11 +6,12 @@ import java.awt.event.*;
 import java.util.*;
 import java.io.*;
 import javax.swing.*;
+import javax.swing.event.*;
 import gnu.io.*;
 import java.util.logging.*;
 
 
-public class MonitorConsole extends JFrame implements SerialPortEventListener {
+public class MonitorConsole extends JFrame {
     
     public MonitorConsole() {
         getContentPane().setLayout(new BorderLayout());
@@ -83,12 +84,12 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
 
         setJMenuBar(mainMenuBar);
 
-        SymWindow aSymWindow = new SymWindow();
+        MonitorWindowAdapter aSymWindow = new MonitorWindowAdapter();
         this.addWindowListener(aSymWindow);
-        SymAction lSymAction = new SymAction();
+        ComponentActionListener lSymAction = new ComponentActionListener();
         openMenuItem.addActionListener(lSymAction);
         exitMenuItem.addActionListener(lSymAction);
-        SymItem lSymItem = new SymItem();
+        ComboBoxItemListener lSymItem = new ComboBoxItemListener();
         portComboBox.addItemListener(lSymItem);
         sendButton.addActionListener(lSymAction);
         sendText.addActionListener(lSymAction);
@@ -118,10 +119,6 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
 
 
     static public void main(String args[]) {
-//        String classPath = System.getProperty("java.class.path");
-//        classPath += ";comm.jar"; // For running from jar.
-//        classPath += ";.\\lib\\comm.jar";
-//        System.setProperty("java.class.path", classPath);
         try {
             (new MonitorConsole()).setVisible(true);
         }
@@ -132,37 +129,6 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
     }
 
     
-    @Override
-    public void serialEvent(SerialPortEvent ev) {
-        if (ev.getEventType() == SerialPortEvent.DATA_AVAILABLE) {
-            try {
-                int available = inputStream.available();
-                byte[] receiveBuffer = new byte[available];
-                inputStream.read(receiveBuffer, 0, receiveBuffer.length);
-                String received;
-                if (byteJRadioButton.isSelected()) {
-                    received = "";
-                    for (int i = 0; i < available; i++) {
-                        received += Byte.toString(receiveBuffer[i]) + ' ';
-                    }
-                    received += CR;
-                }
-                else {
-                    received = new String(receiveBuffer);
-                }
-                receivedText.append(received);
-                if (receivedText.getText().length() > 50000) {
-                    receivedText.replaceRange("", 0, 1000);
-                }
-                shouldScroll = true;
-            }
-            catch (IOException e) {
-                System.out.println(e);
-            }
-        }
-    }
-
-
     @Override
     public void setVisible(boolean visible) {
         if (visible) {
@@ -192,24 +158,12 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
     }
 
     
-    class SymWindow extends java.awt.event.WindowAdapter
-    {
-        @Override
-        public void windowClosing(java.awt.event.WindowEvent event) {
-            Object object = event.getSource();
-            if (object == MonitorConsole.this) {
-                System.exit(0);
-            }
-        }
-    }
-
-
-    void openMenuItem_ActionPerformed(java.awt.event.ActionEvent event) {
-        JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setFileFilter(new TextFileFilter());
+    private void openMenuItem_ActionPerformed(java.awt.event.ActionEvent event) {
+        JFileChooser fileChooser = createFileChooser();
         fileChooser.showOpenDialog(this);
         File file = fileChooser.getSelectedFile();
         if (file.exists()) {
+            defaultDirectory = fileChooser.getCurrentDirectory();
             try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r")) {
                 String text;
                 while ((text = randomAccessFile.readLine()) != null) {
@@ -253,7 +207,7 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
             }
             serialPort.notifyOnDataAvailable(true);
             try {
-                serialPort.addEventListener(this);
+                serialPort.addEventListener(new CommPortListener());
             }
             catch (TooManyListenersException e) {
                     System.out.println(e);
@@ -277,7 +231,7 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
     }
 
 
-    void portChoice_ItemStateChanged(java.awt.event.ItemEvent event) {
+    private void portChoice_ItemStateChanged(java.awt.event.ItemEvent event) {
         String selected = (String) event.getItem();
         if (event.getStateChange() == java.awt.event.ItemEvent.SELECTED) {
             if (! selected.equals("-")) {
@@ -290,7 +244,7 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
     }
 
 
-    void transmitText(String text) {
+    private void transmitText(String text) {
         if (byteJRadioButton.isSelected()) {
             boolean ready = false;
             Scanner scanner = new Scanner(text);
@@ -309,7 +263,7 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
         }
         else {
             try {
-                text += '\15';
+                text += CR;
                 outputStream.write(text.getBytes());
                 sendText.setText("");
             }
@@ -321,27 +275,23 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
     }
 
 
-    void sendButton_ActionPerformed(java.awt.event.ActionEvent event) {
+    private void sendButton_ActionPerformed(java.awt.event.ActionEvent event) {
         transmitText(sendText.getText());
     }
 
 
-    void sendText_ActionPerformed(java.awt.event.ActionEvent event)
-    {
+    private void sendText_ActionPerformed(java.awt.event.ActionEvent event) {
         transmitText(sendText.getText());
     }
 
-    void saveMenuItem_ActionPerformed(java.awt.event.ActionEvent event)
-    {
-        // OpenFileDialog Create and show as modal
-        JFileChooser fileChooser = new JFileChooser();
-        File defDirectory = fileChooser.getCurrentDirectory();
+    
+    private void saveMenuItem_ActionPerformed(java.awt.event.ActionEvent event) {
+        JFileChooser fileChooser = createFileChooser();
         fileChooser.setDialogType(JFileChooser.SAVE_DIALOG);
-        fileChooser.setCurrentDirectory(defDirectory);
-        fileChooser.setFileFilter(new TextFileFilter());
         fileChooser.showSaveDialog(this);
         File file = fileChooser.getSelectedFile();
         if (file != null) {
+            defaultDirectory = fileChooser.getCurrentDirectory();
             try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw")) {
                 randomAccessFile.writeBytes(receivedText.getText());
                 randomAccessFile.close();
@@ -353,8 +303,7 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
     }
 
 
-    void baudChoice_ItemStateChanged(java.awt.event.ItemEvent event)
-    {
+    private void baudComboBox_ItemStateChanged(ItemEvent event) {
         if (serialPort != null) {
             setSerialPortParams();
         }
@@ -373,13 +322,24 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
             Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "setSerialPortParams", ex);
         }
     }
+    
+    
+    private JFileChooser createFileChooser() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setFileFilter(new TextFileFilter());
+        if (defaultDirectory != null) {
+            fileChooser.setCurrentDirectory(defaultDirectory);
+        }
+        return fileChooser;
+        
+    }
 
 
     private class TextFileFilter extends javax.swing.filechooser.FileFilter {
         
         @Override
         public boolean accept(File file) {
-            return file.getName().endsWith(".txt");
+            return file.isDirectory() || file.getName().endsWith(".txt");
         }
         
         @Override
@@ -390,16 +350,28 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
     }
 
     
-    private class SymItem implements java.awt.event.ItemListener {
+    private class MonitorWindowAdapter extends WindowAdapter
+    {
+        @Override
+        public void windowClosing(java.awt.event.WindowEvent event) {
+            Object object = event.getSource();
+            if (object == MonitorConsole.this) {
+                System.exit(0);
+            }
+        }
+    }
+
+
+    private class ComboBoxItemListener implements ItemListener {
         
         @Override
-        public void itemStateChanged(java.awt.event.ItemEvent event) {
+        public void itemStateChanged(ItemEvent event) {
             Object object = event.getSource();
             if (object == portComboBox) {
                 portChoice_ItemStateChanged(event);
             }
             else if (object == baudComboBox) {
-                baudChoice_ItemStateChanged(event);
+                baudComboBox_ItemStateChanged(event);
             }
             sendText.requestFocus();
         }
@@ -407,10 +379,10 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
     }
 
 
-    class SymAction implements java.awt.event.ActionListener {
+    private class ComponentActionListener implements ActionListener {
         
         @Override
-        public void actionPerformed(java.awt.event.ActionEvent event) {
+        public void actionPerformed(ActionEvent event) {
             Object object = event.getSource();
             if (object == openMenuItem) {
                 openMenuItem_ActionPerformed(event);
@@ -433,10 +405,10 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
     }
 
     
-    private class ScrollChangeListener implements javax.swing.event.ChangeListener {
+    private class ScrollChangeListener implements ChangeListener {
         
         @Override
-        public void stateChanged(javax.swing.event.ChangeEvent e) {
+        public void stateChanged(ChangeEvent e) {
             // Test for flag. Otherwise, if we scroll unconditionally, 
             // the scroll bar will be stuck at the bottom even when the 
             // user tries to drag it. So we only scroll when we know 
@@ -451,27 +423,64 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
     }
 
     
+    private class CommPortListener implements SerialPortEventListener  {
+        
+        @Override
+        public void serialEvent(SerialPortEvent ev) {
+            if (ev.getEventType() == SerialPortEvent.DATA_AVAILABLE) {
+                try {
+                    int available = inputStream.available();
+                    byte[] receiveBuffer = new byte[available];
+                    inputStream.read(receiveBuffer, 0, receiveBuffer.length);
+                    String received;
+                    if (byteJRadioButton.isSelected()) {
+                        received = "";
+                        for (int i = 0; i < available; i++) {
+                            received += Byte.toString(receiveBuffer[i]) + ' ';
+                        }
+                        received += CR;
+                    }
+                    else {
+                        received = new String(receiveBuffer);
+                    }
+                    receivedText.append(received);
+                    if (receivedText.getText().length() > 50000) {
+                        receivedText.replaceRange("", 0, 1000);
+                    }
+                    shouldScroll = true;
+                }
+                catch (IOException e) {
+                    System.out.println(e);
+                }
+            }
+        }
+
+    }
+    
+    
     // Used for addNotify check.
-    boolean componentsAdjusted = false;
+    private boolean componentsAdjusted = false;
 
-    JTextField sendText = new JTextField();
-    JTextArea receivedText = new JTextArea();
-    JButton sendButton = new JButton();
-    JComboBox portComboBox = new JComboBox();
-    JComboBox baudComboBox = new JComboBox();
+    private final JTextField sendText = new JTextField();
+    private final JTextArea receivedText = new JTextArea();
+    private final JButton sendButton = new JButton();
+    private final JComboBox portComboBox = new JComboBox();
+    private final JComboBox baudComboBox = new JComboBox();
 
-    JMenuBar mainMenuBar = new JMenuBar();
-    JMenu fileMenu = new JMenu();
-    JMenuItem newMenuItem = new JMenuItem();
-    JMenuItem openMenuItem = new JMenuItem();
-    JMenuItem saveMenuItem = new JMenuItem();
-    JMenuItem saveAsMenuItem = new JMenuItem();
-    JMenuItem separatorMenuItem = new JMenuItem();
-    JMenuItem exitMenuItem = new JMenuItem();
-    JMenu editMenu = new JMenu();
-    JMenuItem cutMenuItem = new JMenuItem();
-    JMenuItem copyMenuItem = new JMenuItem();
-    JMenuItem pasteMenuItem = new JMenuItem();
+    private final JMenuBar mainMenuBar = new JMenuBar();
+    private final JMenu fileMenu = new JMenu();
+    private final JMenuItem newMenuItem = new JMenuItem();
+    private final JMenuItem openMenuItem = new JMenuItem();
+    private final JMenuItem saveMenuItem = new JMenuItem();
+    private final JMenuItem saveAsMenuItem = new JMenuItem();
+    private final JMenuItem separatorMenuItem = new JMenuItem();
+    private final JMenuItem exitMenuItem = new JMenuItem();
+    private final JMenu editMenu = new JMenu();
+    private final JMenuItem cutMenuItem = new JMenuItem();
+    private final JMenuItem copyMenuItem = new JMenuItem();
+    private final JMenuItem pasteMenuItem = new JMenuItem();
+    
+    private File defaultDirectory;
 
     private JScrollPane receivePane;
     private JRadioButton textJRadioButton;

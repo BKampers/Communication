@@ -3,7 +3,7 @@ package bka.communication;
 
 import java.util.*;
 import java.io.*;
-import javax.comm.*;
+import gnu.io.*;
 
 
 public class SerialPortChannel extends Channel
@@ -40,7 +40,7 @@ public class SerialPortChannel extends Channel
             inputStream = port.getInputStream();
             outputStream = port.getOutputStream();
         }
-        catch (Exception ex) {
+        catch (PortInUseException | UnsupportedCommOperationException | TooManyListenersException | IOException ex) {
             throw new ChannelException(ex);
         }
     }
@@ -101,7 +101,7 @@ public class SerialPortChannel extends Channel
     
     
     public static Collection<SerialPortChannel> findAll() {
-        Collection<SerialPortChannel> all = new ArrayList<SerialPortChannel>();
+        Collection<SerialPortChannel> all = new ArrayList<>();
 	Enumeration portList = CommPortIdentifier.getPortIdentifiers();
     	while (portList.hasMoreElements()) {
             CommPortIdentifier portId = (CommPortIdentifier) portList.nextElement();
@@ -132,8 +132,8 @@ public class SerialPortChannel extends Channel
 
 
     private final CommPortIdentifier commPortIdentifier;
-    private SerialPort port = null;
-    private InputStream inputStream = null;
-    private OutputStream outputStream = null;
+    private SerialPort port;
+    private InputStream inputStream;
+    private OutputStream outputStream;
         
 }

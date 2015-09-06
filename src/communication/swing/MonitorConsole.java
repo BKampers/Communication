@@ -158,7 +158,7 @@ public class MonitorConsole extends JFrame {
     }
 
     
-    private void openMenuItem_ActionPerformed(java.awt.event.ActionEvent event) {
+    private void openMenuItem_actionPerformed(ActionEvent event) {
         JFileChooser fileChooser = createFileChooser();
         fileChooser.showOpenDialog(this);
         File file = fileChooser.getSelectedFile();
@@ -177,12 +177,59 @@ public class MonitorConsole extends JFrame {
     }
 
 
-    void exitMenuItem_ActionPerformed(java.awt.event.ActionEvent event)
-    {
+    private void saveMenuItem_actionPerformed(ActionEvent event) {
+        JFileChooser fileChooser = createFileChooser();
+        fileChooser.setDialogType(JFileChooser.SAVE_DIALOG);
+        fileChooser.showSaveDialog(this);
+        File file = fileChooser.getSelectedFile();
+        if (file != null) {
+            defaultDirectory = fileChooser.getCurrentDirectory();
+            try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw")) {
+                randomAccessFile.writeBytes(receivedText.getText());
+                randomAccessFile.close();
+            }
+            catch (Exception ex) {
+                Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "saveMenuItem_ActionPerformed", ex);
+            }
+        }
+    }
+
+
+    private void exitMenuItem_actionPerformed(ActionEvent event) {
         System.exit(0);
     }
 
 
+    private void portComboBox_itemStateChanged(ItemEvent event) {
+        String selected = (String) event.getItem();
+        if (event.getStateChange() == ItemEvent.SELECTED) {
+            if (! selected.equals("-")) {
+                openSerialPort((CommPortIdentifier) tableOfPorts.get(selected));
+            }
+            else {
+                openSerialPort(null);
+            }
+        }
+    }
+
+
+    private void baudComboBox_itemStateChanged(ItemEvent event) {
+        if (serialPort != null) {
+            setSerialPortParams();
+        }
+    }
+
+
+    private void sendButton_actionPerformed(ActionEvent event) {
+        transmitText(sendText.getText());
+    }
+
+
+    private void sendText_actionPerformed(ActionEvent event) {
+        transmitText(sendText.getText());
+    }
+
+    
     private void openSerialPort(CommPortIdentifier commPortIdentifier) {
         if (openedPort != null) {
             serialPort.close();
@@ -231,19 +278,6 @@ public class MonitorConsole extends JFrame {
     }
 
 
-    private void portChoice_ItemStateChanged(java.awt.event.ItemEvent event) {
-        String selected = (String) event.getItem();
-        if (event.getStateChange() == java.awt.event.ItemEvent.SELECTED) {
-            if (! selected.equals("-")) {
-                openSerialPort((CommPortIdentifier) tableOfPorts.get(selected));
-            }
-            else {
-                openSerialPort(null);
-            }
-        }
-    }
-
-
     private void transmitText(String text) {
         if (byteJRadioButton.isSelected()) {
             boolean ready = false;
@@ -271,41 +305,6 @@ public class MonitorConsole extends JFrame {
                 System.out.println(t);
                 JOptionPane.showMessageDialog(this, t.toString(), "Port error", JOptionPane.ERROR_MESSAGE); 
             }
-        }
-    }
-
-
-    private void sendButton_ActionPerformed(java.awt.event.ActionEvent event) {
-        transmitText(sendText.getText());
-    }
-
-
-    private void sendText_ActionPerformed(java.awt.event.ActionEvent event) {
-        transmitText(sendText.getText());
-    }
-
-    
-    private void saveMenuItem_ActionPerformed(java.awt.event.ActionEvent event) {
-        JFileChooser fileChooser = createFileChooser();
-        fileChooser.setDialogType(JFileChooser.SAVE_DIALOG);
-        fileChooser.showSaveDialog(this);
-        File file = fileChooser.getSelectedFile();
-        if (file != null) {
-            defaultDirectory = fileChooser.getCurrentDirectory();
-            try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw")) {
-                randomAccessFile.writeBytes(receivedText.getText());
-                randomAccessFile.close();
-            }
-            catch (Exception ex) {
-                Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "saveMenuItem_ActionPerformed", ex);
-            }
-        }
-    }
-
-
-    private void baudComboBox_ItemStateChanged(ItemEvent event) {
-        if (serialPort != null) {
-            setSerialPortParams();
         }
     }
 
@@ -368,10 +367,10 @@ public class MonitorConsole extends JFrame {
         public void itemStateChanged(ItemEvent event) {
             Object object = event.getSource();
             if (object == portComboBox) {
-                portChoice_ItemStateChanged(event);
+                portComboBox_itemStateChanged(event);
             }
             else if (object == baudComboBox) {
-                baudComboBox_ItemStateChanged(event);
+                baudComboBox_itemStateChanged(event);
             }
             sendText.requestFocus();
         }
@@ -385,19 +384,19 @@ public class MonitorConsole extends JFrame {
         public void actionPerformed(ActionEvent event) {
             Object object = event.getSource();
             if (object == openMenuItem) {
-                openMenuItem_ActionPerformed(event);
+                openMenuItem_actionPerformed(event);
             }
             else if (object == exitMenuItem) {
-                exitMenuItem_ActionPerformed(event);
+                exitMenuItem_actionPerformed(event);
             }
             else if (object == sendButton) {
-                sendButton_ActionPerformed(event);
+                sendButton_actionPerformed(event);
             }
             else if (object == sendText) {
-                sendText_ActionPerformed(event);
+                sendText_actionPerformed(event);
             }
             else if (object == saveMenuItem) {
-                saveMenuItem_ActionPerformed(event);
+                saveMenuItem_actionPerformed(event);
             }
             sendText.requestFocus();
         }

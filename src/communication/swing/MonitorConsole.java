@@ -2,20 +2,21 @@ package communication.swing;
 
 
 import java.awt.*;
+import java.awt.event.*;
 import java.util.*;
 import java.io.*;
 import javax.swing.*;
-import javax.comm.*;
+import javax.swing.event.*;
+import gnu.io.*;
+import java.util.logging.*;
 
 
-public class MonitorConsole extends JFrame implements SerialPortEventListener {
+public class MonitorConsole extends JFrame {
     
     public MonitorConsole() {
         getContentPane().setLayout(new BorderLayout());
         setBackground(java.awt.Color.white);
         setSize(600, 500);
-        setVisible(false);
-        openFileDialog1.setDialogType(JFileChooser.OPEN_DIALOG);
         JPanel sendPanel = new JPanel();
         sendText.setPreferredSize(new Dimension(430, 25));
         sendPanel.add(sendText);
@@ -25,18 +26,18 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
         getContentPane().add(sendPanel, BorderLayout.SOUTH);
         receivePane = new JScrollPane();
         receivePane.setPreferredSize(new Dimension(430, 400));
-        JScrollBar jScrollBar = receivePane.getVerticalScrollBar();
-        jScrollBar.getModel().addChangeListener(new ScrollChangeListener());
+        JScrollBar scrollBar = receivePane.getVerticalScrollBar();
+        scrollBar.getModel().addChangeListener(new ScrollChangeListener());
         receivedText.setEditable(false);
         receivedText.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.DEFAULT_CURSOR));
         receivedText.setFont(new Font("MonoSpaced", Font.PLAIN, 12));
         receivePane.getViewport().add(receivedText);
         getContentPane().add(receivePane, BorderLayout.CENTER);
         JPanel choicePanel = new JPanel();
-        portChoice.setPreferredSize(new Dimension(75, 25));
-        choicePanel.add(portChoice, BorderLayout.NORTH);
-        baudChoice.setPreferredSize(new Dimension(75, 25));
-        choicePanel.add(baudChoice);
+        portComboBox.setPreferredSize(new Dimension(75, 25));
+        choicePanel.add(portComboBox, BorderLayout.NORTH);
+        baudComboBox.setPreferredSize(new Dimension(75, 25));
+        choicePanel.add(baudComboBox);
         textJRadioButton = new JRadioButton("Text", true);
         byteJRadioButton = new JRadioButton("Byte", false);
         ButtonGroup buttonGroup = new ButtonGroup();
@@ -47,83 +48,65 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
         getContentPane().add(choicePanel, BorderLayout.NORTH); 
         setTitle("COM Monitor");
 
-        menu1.setText("File");
-        menu1.add(newMenuItem);
+        fileMenu.setText("File");
+        fileMenu.add(newMenuItem);
         newMenuItem.setEnabled(false);
         newMenuItem.setText("New");
-        newMenuItem.setAccelerator(
-            KeyStroke.getKeyStroke(
-                java.awt.event.KeyEvent.VK_N, 
-                java.awt.event.InputEvent.CTRL_MASK));
-        menu1.add(openMenuItem);
+        newMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_MASK));
+        fileMenu.add(openMenuItem);
         openMenuItem.setText("Open...");
-        openMenuItem.setAccelerator(
-            KeyStroke.getKeyStroke(
-                java.awt.event.KeyEvent.VK_O,
-                java.awt.event.InputEvent.CTRL_MASK));
-        menu1.add(saveMenuItem);
+        openMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_O, InputEvent.CTRL_MASK));
+        fileMenu.add(saveMenuItem);
         saveMenuItem.setText("Save");
-        saveMenuItem.setAccelerator(
-            KeyStroke.getKeyStroke(
-                java.awt.event.KeyEvent.VK_S,
-                java.awt.event.InputEvent.CTRL_MASK));
-        menu1.add(saveAsMenuItem);
+        saveMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_MASK));
+        fileMenu.add(saveAsMenuItem);
         saveAsMenuItem.setEnabled(false);
         saveAsMenuItem.setText("Save As...");
-        menu1.add(separatorMenuItem);
+        fileMenu.add(separatorMenuItem);
         separatorMenuItem.setText("-");
-        menu1.add(exitMenuItem);
+        fileMenu.add(exitMenuItem);
         exitMenuItem.setText("Exit");
-        mainMenuBar.add(menu1);
-        menu2.setText("Edit");
-        menu2.add(cutMenuItem);
+        mainMenuBar.add(fileMenu);
+        editMenu.setText("Edit");
+        editMenu.add(cutMenuItem);
         cutMenuItem.setEnabled(false);
         cutMenuItem.setText("Cut");
-        cutMenuItem.setAccelerator(
-            KeyStroke.getKeyStroke(
-                java.awt.event.KeyEvent.VK_X,
-                java.awt.event.InputEvent.CTRL_MASK));
-        menu2.add(copyMenuItem);
+        cutMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_X, InputEvent.CTRL_MASK));
+        editMenu.add(copyMenuItem);
         copyMenuItem.setEnabled(false);
         copyMenuItem.setText("Copy");
-        copyMenuItem.setAccelerator(
-            KeyStroke.getKeyStroke(
-                java.awt.event.KeyEvent.VK_C,
-                java.awt.event.InputEvent.CTRL_MASK));
-        menu2.add(pasteMenuItem);
+        copyMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_C, InputEvent.CTRL_MASK));
+        editMenu.add(pasteMenuItem);
         pasteMenuItem.setEnabled(false);
         pasteMenuItem.setText("Paste");
-        pasteMenuItem.setAccelerator(
-            KeyStroke.getKeyStroke(
-                java.awt.event.KeyEvent.VK_V,
-                java.awt.event.InputEvent.CTRL_MASK));
-        mainMenuBar.add(menu2);
+        pasteMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.CTRL_MASK));
+        mainMenuBar.add(editMenu);
 
         setJMenuBar(mainMenuBar);
 
-        SymWindow aSymWindow = new SymWindow();
+        MonitorWindowAdapter aSymWindow = new MonitorWindowAdapter();
         this.addWindowListener(aSymWindow);
-        SymAction lSymAction = new SymAction();
+        ComponentActionListener lSymAction = new ComponentActionListener();
         openMenuItem.addActionListener(lSymAction);
         exitMenuItem.addActionListener(lSymAction);
-        SymItem lSymItem = new SymItem();
-        portChoice.addItemListener(lSymItem);
+        ComboBoxItemListener lSymItem = new ComboBoxItemListener();
+        portComboBox.addItemListener(lSymItem);
         sendButton.addActionListener(lSymAction);
         sendText.addActionListener(lSymAction);
         saveMenuItem.addActionListener(lSymAction);
-        baudChoice.addItemListener(lSymItem);
+        baudComboBox.addItemListener(lSymItem);
         textJRadioButton.addItemListener(lSymItem);
         byteJRadioButton.addItemListener(lSymItem);
 
         findPorts();
-        baudChoice.addItem("115200");
-        baudChoice.addItem( "57600");
-        baudChoice.addItem( "38400");
-        baudChoice.addItem( "19200");
-        baudChoice.addItem(  "9600");
-        baudChoice.addItem(  "4800");
-        baudChoice.addItem(  "2400");
-        baudChoice.addItem(  "1200");
+        baudComboBox.addItem("115200");
+        baudComboBox.addItem("57600");
+        baudComboBox.addItem("38400");
+        baudComboBox.addItem("19200");
+        baudComboBox.addItem("9600");
+        baudComboBox.addItem("4800");
+        baudComboBox.addItem("2400");
+        baudComboBox.addItem("1200");
         
         pack();
     }
@@ -136,53 +119,17 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
 
 
     static public void main(String args[]) {
-        String classPath = System.getProperty("java.class.path");
-//        classPath += ";comm.jar"; // For running from jar.
-        classPath += ";.\\lib\\comm.jar";
-        System.setProperty("java.class.path", classPath);
         try {
-            //Create a new instance of our application's frame, and make it visible.
             (new MonitorConsole()).setVisible(true);
         }
         catch (Throwable t) {
-            System.err.println(t);
-            t.printStackTrace();
-            //Ensure the application exits with an error condition.
+            Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "main", t);
             System.exit(1);
         }
     }
 
     
-    public void serialEvent(SerialPortEvent ev) {
-        if (ev.getEventType() == SerialPortEvent.DATA_AVAILABLE) {
-            try {
-                int available = inputStream.available();
-                byte[] receiveBuffer = new byte[available];
-                inputStream.read(receiveBuffer, 0, receiveBuffer.length);
-                String received;
-                if (byteJRadioButton.isSelected()) {
-                    received = "";
-                    for (int i = 0; i < available; i++) {
-                        received += Byte.toString(receiveBuffer[i]) + ' ';
-                    }
-                    received += CR;
-                }
-                else {
-                    received = new String(receiveBuffer);
-                }
-                receivedText.append(received);
-                if (receivedText.getText().length() > 50000) {
-                    receivedText.replaceRange("", 0, 1000);
-                }
-                shouldScroll = true;
-            }
-            catch (IOException e) {
-                System.out.println(e);
-            }
-        }
-    }
-
-
+    @Override
     public void setVisible(boolean visible) {
         if (visible) {
             setLocation(50, 50);
@@ -191,74 +138,98 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
     }
 
 
+    @Override
     public void addNotify() {
         // Record the size of the window prior to calling parents addNotify.
-        Dimension d = getSize();
-
+        Dimension dimension = getSize();
         super.addNotify();
-
-        if (fComponentsAdjusted) {
+        if (componentsAdjusted) {
             return;
         }
-
         // Adjust components according to the insets
-        setSize(getInsets().left + getInsets().right + d.width, getInsets().top + getInsets().bottom + d.height);
+        setSize(getInsets().left + getInsets().right + dimension.width, getInsets().top + getInsets().bottom + dimension.height);
         Component components[] = getComponents();
-        for (int i = 0; i < components.length; i++) {
-            Point p = components[i].getLocation();
-            p.translate(getInsets().left, getInsets().top);
-            components[i].setLocation(p);
+        for (Component component : components) {
+            Point point = component.getLocation();
+            point.translate(getInsets().left, getInsets().top);
+            component.setLocation(point);
         }
-        fComponentsAdjusted = true;
+        componentsAdjusted = true;
     }
 
     
-    class SymWindow extends java.awt.event.WindowAdapter
-    {
-        public void windowClosing(java.awt.event.WindowEvent event) {
-            Object object = event.getSource();
-            if (object == MonitorConsole.this) {
-                System.exit(0);
+    private void openMenuItem_actionPerformed(ActionEvent event) {
+        JFileChooser fileChooser = createFileChooser();
+        fileChooser.showOpenDialog(this);
+        File file = fileChooser.getSelectedFile();
+        if (file.exists()) {
+            defaultDirectory = fileChooser.getCurrentDirectory();
+            try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r")) {
+                String text;
+                while ((text = randomAccessFile.readLine()) != null) {
+                    transmitText(text);
+                }
+            }
+            catch (IOException ex) {
+                Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "openMenuItem_ActionPerformed", ex);
             }
         }
     }
 
 
-    void openMenuItem_ActionPerformed(java.awt.event.ActionEvent event) {
-        openMenuItem_ActionPerformed_Interaction1(event);
-    }
-
-
-    void openMenuItem_ActionPerformed_Interaction1(java.awt.event.ActionEvent event) {
-        try {
-            // OpenFileDialog Create and show as modal
-            openFileDialog1 = new JFileChooser();
-            openFileDialog1.setFileFilter(new TextFileFilter());
-            openFileDialog1.setVisible(true);
-            File file = openFileDialog1.getSelectedFile();
-            if (file.exists()) {
-                RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r");
-                String text;
-                 do {
-                    text = randomAccessFile.readLine();
-                    if (text != null) {
-                        transmitText(text);
-                    }
-                } while (text != null);
+    private void saveMenuItem_actionPerformed(ActionEvent event) {
+        JFileChooser fileChooser = createFileChooser();
+        fileChooser.setDialogType(JFileChooser.SAVE_DIALOG);
+        fileChooser.showSaveDialog(this);
+        File file = fileChooser.getSelectedFile();
+        if (file != null) {
+            defaultDirectory = fileChooser.getCurrentDirectory();
+            try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw")) {
+                randomAccessFile.writeBytes(receivedText.getText());
                 randomAccessFile.close();
             }
-        } catch (Exception e) {
-            System.out.println(e);
+            catch (Exception ex) {
+                Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "saveMenuItem_ActionPerformed", ex);
+            }
         }
     }
 
 
-    void exitMenuItem_ActionPerformed(java.awt.event.ActionEvent event)
-    {
+    private void exitMenuItem_actionPerformed(ActionEvent event) {
         System.exit(0);
     }
 
 
+    private void portComboBox_itemStateChanged(ItemEvent event) {
+        String selected = (String) event.getItem();
+        if (event.getStateChange() == ItemEvent.SELECTED) {
+            if (! selected.equals("-")) {
+                openSerialPort((CommPortIdentifier) tableOfPorts.get(selected));
+            }
+            else {
+                openSerialPort(null);
+            }
+        }
+    }
+
+
+    private void baudComboBox_itemStateChanged(ItemEvent event) {
+        if (serialPort != null) {
+            setSerialPortParams();
+        }
+    }
+
+
+    private void sendButton_actionPerformed(ActionEvent event) {
+        transmitText(sendText.getText());
+    }
+
+
+    private void sendText_actionPerformed(ActionEvent event) {
+        transmitText(sendText.getText());
+    }
+
+    
     private void openSerialPort(CommPortIdentifier commPortIdentifier) {
         if (openedPort != null) {
             serialPort.close();
@@ -283,7 +254,7 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
             }
             serialPort.notifyOnDataAvailable(true);
             try {
-                serialPort.addEventListener(this);
+                serialPort.addEventListener(new CommPortListener());
             }
             catch (TooManyListenersException e) {
                     System.out.println(e);
@@ -294,33 +265,20 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
 
 
     private void findPorts() {
-        portChoice.addItem("-");
+        portComboBox.addItem("-");
         Enumeration portList = CommPortIdentifier.getPortIdentifiers();
         while (portList.hasMoreElements()) {
             CommPortIdentifier portId = (CommPortIdentifier) portList.nextElement();
             String name = portId.getName();
             if (name.substring(0, 3).equals("COM")) {
                 tableOfPorts.put(name, portId);
-                portChoice.addItem(name);
+                portComboBox.addItem(name);
             }
         }
     }
 
 
-    void portChoice_ItemStateChanged(java.awt.event.ItemEvent event) {
-        String selected = (String) event.getItem();
-        if (event.getStateChange() == java.awt.event.ItemEvent.SELECTED) {
-            if (! selected.equals("-")) {
-                openSerialPort((CommPortIdentifier) tableOfPorts.get(selected));
-            }
-            else {
-                openSerialPort(null);
-            }
-        }
-    }
-
-
-    void transmitText(String text) {
+    private void transmitText(String text) {
         if (byteJRadioButton.isSelected()) {
             boolean ready = false;
             Scanner scanner = new Scanner(text);
@@ -339,7 +297,7 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
         }
         else {
             try {
-                text += '\15';
+                text += CR;
                 outputStream.write(text.getBytes());
                 sendText.setText("");
             }
@@ -351,107 +309,105 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
     }
 
 
-    void sendButton_ActionPerformed(java.awt.event.ActionEvent event) {
-        transmitText(sendText.getText());
-    }
-
-
-    void sendText_ActionPerformed(java.awt.event.ActionEvent event)
-    {
-        transmitText(sendText.getText());
-    }
-
-    void saveMenuItem_ActionPerformed(java.awt.event.ActionEvent event)
-    {
-            try {
-                // OpenFileDialog Create and show as modal
-                File defDirectory = openFileDialog1.getCurrentDirectory();
-                openFileDialog1 = new JFileChooser();
-                openFileDialog1.setDialogType(JFileChooser.SAVE_DIALOG);
-                openFileDialog1.setCurrentDirectory(defDirectory);
-                openFileDialog1.setFileFilter(new TextFileFilter());
-                openFileDialog1.setVisible(true);
-                File file = openFileDialog1.getSelectedFile();
-                RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw");
-                randomAccessFile.writeBytes(receivedText.getText());
-                randomAccessFile.close();
-            } catch (Exception e) {
-                System.out.println(e);
-            }
-    }
-
-
-    void baudChoice_ItemStateChanged(java.awt.event.ItemEvent event)
-    {
-        if (serialPort != null) {
-            setSerialPortParams();
-        }
-    }
-
-
     private void setSerialPortParams() {
         try {
             serialPort.setSerialPortParams(
-                Integer.parseInt(baudChoice.getSelectedItem().toString()),
+                Integer.parseInt(baudComboBox.getSelectedItem().toString()),
                 SerialPort.DATABITS_8,
                 SerialPort.STOPBITS_1,
                 SerialPort.PARITY_NONE);
         } 
-        catch (Exception e) {
-            System.out.println(e);
+        catch (NumberFormatException | UnsupportedCommOperationException ex) {
+            Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "setSerialPortParams", ex);
         }
+    }
+    
+    
+    private JFileChooser createFileChooser() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setFileFilter(new TextFileFilter());
+        if (defaultDirectory != null) {
+            fileChooser.setCurrentDirectory(defaultDirectory);
+        }
+        return fileChooser;
+        
     }
 
 
     private class TextFileFilter extends javax.swing.filechooser.FileFilter {
+        
+        @Override
         public boolean accept(File file) {
-            return file.getName().endsWith(".txt");
+            return file.isDirectory() || file.getName().endsWith(".txt");
         }
+        
+        @Override
         public String getDescription() {
             return "Text files";
         }
+        
     }
 
     
-    private class SymItem implements java.awt.event.ItemListener {
-        public void itemStateChanged(java.awt.event.ItemEvent event) {
+    private class MonitorWindowAdapter extends WindowAdapter
+    {
+        @Override
+        public void windowClosing(java.awt.event.WindowEvent event) {
             Object object = event.getSource();
-            if (object == portChoice) {
-                portChoice_ItemStateChanged(event);
+            if (object == MonitorConsole.this) {
+                System.exit(0);
             }
-            else if (object == baudChoice) {
-                baudChoice_ItemStateChanged(event);
-            }
-            sendText.requestFocus();
         }
     }
 
 
-    class SymAction implements java.awt.event.ActionListener {
-        public void actionPerformed(java.awt.event.ActionEvent event) {
+    private class ComboBoxItemListener implements ItemListener {
+        
+        @Override
+        public void itemStateChanged(ItemEvent event) {
+            Object object = event.getSource();
+            if (object == portComboBox) {
+                portComboBox_itemStateChanged(event);
+            }
+            else if (object == baudComboBox) {
+                baudComboBox_itemStateChanged(event);
+            }
+            sendText.requestFocus();
+        }
+        
+    }
+
+
+    private class ComponentActionListener implements ActionListener {
+        
+        @Override
+        public void actionPerformed(ActionEvent event) {
             Object object = event.getSource();
             if (object == openMenuItem) {
-                openMenuItem_ActionPerformed(event);
+                openMenuItem_actionPerformed(event);
             }
             else if (object == exitMenuItem) {
-                exitMenuItem_ActionPerformed(event);
+                exitMenuItem_actionPerformed(event);
             }
             else if (object == sendButton) {
-                sendButton_ActionPerformed(event);
+                sendButton_actionPerformed(event);
             }
             else if (object == sendText) {
-                sendText_ActionPerformed(event);
+                sendText_actionPerformed(event);
             }
             else if (object == saveMenuItem) {
-                saveMenuItem_ActionPerformed(event);
+                saveMenuItem_actionPerformed(event);
             }
             sendText.requestFocus();
         }
+        
     }
 
     
-    private class ScrollChangeListener implements javax.swing.event.ChangeListener {
-        public void stateChanged(javax.swing.event.ChangeEvent e) {
+    private class ScrollChangeListener implements ChangeListener {
+        
+        @Override
+        public void stateChanged(ChangeEvent e) {
             // Test for flag. Otherwise, if we scroll unconditionally, 
             // the scroll bar will be stuck at the bottom even when the 
             // user tries to drag it. So we only scroll when we know 
@@ -462,44 +418,79 @@ public class MonitorConsole extends JFrame implements SerialPortEventListener {
                 shouldScroll = false;
             }
         }
+        
     }
 
     
+    private class CommPortListener implements SerialPortEventListener  {
+        
+        @Override
+        public void serialEvent(SerialPortEvent ev) {
+            if (ev.getEventType() == SerialPortEvent.DATA_AVAILABLE) {
+                try {
+                    int available = inputStream.available();
+                    byte[] receiveBuffer = new byte[available];
+                    inputStream.read(receiveBuffer, 0, receiveBuffer.length);
+                    String received;
+                    if (byteJRadioButton.isSelected()) {
+                        received = "";
+                        for (int i = 0; i < available; i++) {
+                            received += Byte.toString(receiveBuffer[i]) + ' ';
+                        }
+                        received += CR;
+                    }
+                    else {
+                        received = new String(receiveBuffer);
+                    }
+                    receivedText.append(received);
+                    if (receivedText.getText().length() > 50000) {
+                        receivedText.replaceRange("", 0, 1000);
+                    }
+                    shouldScroll = true;
+                }
+                catch (IOException e) {
+                    System.out.println(e);
+                }
+            }
+        }
+
+    }
+    
+    
     // Used for addNotify check.
-    boolean fComponentsAdjusted = false;
+    private boolean componentsAdjusted = false;
 
-    JFileChooser openFileDialog1 = new JFileChooser();
-    JTextField sendText = new JTextField();
-    JTextArea receivedText = new JTextArea();
-    JButton sendButton = new JButton();
-    JComboBox portChoice = new JComboBox();
-    JComboBox baudChoice = new JComboBox();
+    private final JTextField sendText = new JTextField();
+    private final JTextArea receivedText = new JTextArea();
+    private final JButton sendButton = new JButton();
+    private final JComboBox portComboBox = new JComboBox();
+    private final JComboBox baudComboBox = new JComboBox();
 
-    JMenuBar mainMenuBar = new JMenuBar();
-    JMenu menu1 = new JMenu();
-    JMenuItem newMenuItem = new JMenuItem();
-    JMenuItem openMenuItem = new JMenuItem();
-    JMenuItem saveMenuItem = new JMenuItem();
-    JMenuItem saveAsMenuItem = new JMenuItem();
-    JMenuItem separatorMenuItem = new JMenuItem();
-    JMenuItem exitMenuItem = new JMenuItem();
-    JMenu menu2 = new JMenu();
-    JMenuItem cutMenuItem = new JMenuItem();
-    JMenuItem copyMenuItem = new JMenuItem();
-    JMenuItem pasteMenuItem = new JMenuItem();
-    JMenu menu3 = new JMenu();
+    private final JMenuBar mainMenuBar = new JMenuBar();
+    private final JMenu fileMenu = new JMenu();
+    private final JMenuItem newMenuItem = new JMenuItem();
+    private final JMenuItem openMenuItem = new JMenuItem();
+    private final JMenuItem saveMenuItem = new JMenuItem();
+    private final JMenuItem saveAsMenuItem = new JMenuItem();
+    private final JMenuItem separatorMenuItem = new JMenuItem();
+    private final JMenuItem exitMenuItem = new JMenuItem();
+    private final JMenu editMenu = new JMenu();
+    private final JMenuItem cutMenuItem = new JMenuItem();
+    private final JMenuItem copyMenuItem = new JMenuItem();
+    private final JMenuItem pasteMenuItem = new JMenuItem();
+    
+    private File defaultDirectory;
 
     private JScrollPane receivePane;
     private JRadioButton textJRadioButton;
     private JRadioButton byteJRadioButton;
     
-    private Hashtable tableOfPorts = new Hashtable();
     private CommPortIdentifier openedPort = null;
-
     private SerialPort serialPort;
     private OutputStream outputStream;
     private InputStream inputStream;
 
+    private final Map<String, CommPortIdentifier> tableOfPorts = new HashMap<>();
 
     private boolean shouldScroll = false;
     

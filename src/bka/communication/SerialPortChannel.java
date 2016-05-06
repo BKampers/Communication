@@ -4,6 +4,7 @@ package bka.communication;
 import java.util.*;
 import java.io.*;
 import gnu.io.*;
+import java.util.logging.*;
 
 
 public class SerialPortChannel extends Channel
@@ -19,8 +20,14 @@ public class SerialPortChannel extends Channel
     }
         
     
-    public static SerialPortChannel create(String portName) throws NoSuchPortException {
-        return create(CommPortIdentifier.getPortIdentifier(portName));
+    public static SerialPortChannel create(String portName) throws ChannelException {
+        try {
+            return create(CommPortIdentifier.getPortIdentifier(portName));
+        }
+        catch (NoSuchPortException ex) {
+            Logger.getLogger(SerialPortChannel.class.getName()).log(Level.SEVERE, null, ex);
+            throw new ChannelException(ex);
+        }
     }
         
     
@@ -100,16 +107,21 @@ public class SerialPortChannel extends Channel
     }
     
     
-    public static Collection<SerialPortChannel> findAll() {
-        Collection<SerialPortChannel> all = new ArrayList<>();
-	Enumeration portList = CommPortIdentifier.getPortIdentifiers();
-    	while (portList.hasMoreElements()) {
-            CommPortIdentifier portId = (CommPortIdentifier) portList.nextElement();
-            if (portId.getName().startsWith("COM")) {
-                all.add(new SerialPortChannel(portId));
+    public static Collection<SerialPortChannel> findAll() throws ChannelException {
+        try {
+            Collection<SerialPortChannel> all = new ArrayList<>();
+            Enumeration portList = CommPortIdentifier.getPortIdentifiers();
+            while (portList.hasMoreElements()) {
+                CommPortIdentifier portId = (CommPortIdentifier) portList.nextElement();
+                if (portId.getName().startsWith("COM")) {
+                    all.add(new SerialPortChannel(portId));
+                }
             }
+            return all;
         }
-        return all;
+        catch (Throwable t) {
+            throw new ChannelException(t);
+        }
     }
     
     

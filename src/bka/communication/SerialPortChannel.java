@@ -4,28 +4,32 @@ package bka.communication;
 import java.util.*;
 import java.io.*;
 import gnu.io.*;
-import java.util.logging.*;
 
 
 public class SerialPortChannel extends Channel
 {
 
-    private SerialPortChannel(CommPortIdentifier commPortIdentifier) {
+    private SerialPortChannel(CommPortIdentifier commPortIdentifier, int baudrate) {
         this.commPortIdentifier = commPortIdentifier;
+        this.baudrate = baudrate;
     }
     
     
+    public static SerialPortChannel create(CommPortIdentifier commPortIdentifier, int baudrate) {
+        return new SerialPortChannel(commPortIdentifier, baudrate);
+    }
+
+
     public static SerialPortChannel create(CommPortIdentifier commPortIdentifier) {
-        return new SerialPortChannel(commPortIdentifier);
+        return create(commPortIdentifier, 19200);
     }
-        
-    
+
+
     public static SerialPortChannel create(String portName) throws ChannelException {
         try {
             return create(CommPortIdentifier.getPortIdentifier(portName));
         }
         catch (NoSuchPortException ex) {
-            Logger.getLogger(SerialPortChannel.class.getName()).log(Level.SEVERE, null, ex);
             throw new ChannelException(ex);
         }
     }
@@ -38,7 +42,7 @@ public class SerialPortChannel extends Channel
                 port = (SerialPort) commPortIdentifier.open(name, 2000);
             }
             port.setSerialPortParams(
-                19200, 
+                baudrate,
                 SerialPort.DATABITS_8, 
                 SerialPort.STOPBITS_1, 
                 SerialPort.PARITY_NONE);
@@ -53,27 +57,8 @@ public class SerialPortChannel extends Channel
     }
     
     
-    public void setBaud(int baud) throws ChannelException {
-        try {
-            port.setSerialPortParams(
-                baud, 
-                SerialPort.DATABITS_8, 
-                SerialPort.STOPBITS_1, 
-                SerialPort.PARITY_NONE);
-        }
-        catch (Exception ex) {
-            throw new ChannelException(ex);
-        }
-    }
-    
-    
-    public int getBaud() throws ChannelException {
-        try {
-            return port.getBaudRate();
-        }
-        catch (NullPointerException ex) {
-            throw new ChannelException(ex);
-        }
+    public void setBaudrate(int baudrate) {
+        this.baudrate = baudrate;
     }
     
     
@@ -114,7 +99,7 @@ public class SerialPortChannel extends Channel
             while (portList.hasMoreElements()) {
                 CommPortIdentifier portId = (CommPortIdentifier) portList.nextElement();
                 if (portId.getName().startsWith("COM")) {
-                    all.add(new SerialPortChannel(portId));
+                    all.add(create(portId));
                 }
             }
             return all;
@@ -144,6 +129,8 @@ public class SerialPortChannel extends Channel
 
 
     private final CommPortIdentifier commPortIdentifier;
+    private int baudrate;
+
     private SerialPort port;
     private InputStream inputStream;
     private OutputStream outputStream;

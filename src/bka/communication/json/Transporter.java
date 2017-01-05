@@ -71,11 +71,11 @@ public class Transporter {
         private void processReceivedCharacters() {
             try {
                 receivedObjects.add(new JSONObject(receivedCharacters.toString()));
-                receivedCharacters = new StringBuilder();
             }
             catch (org.json.JSONException ex) {
                 handleException(ex);
             }
+            receivedCharacters = new StringBuilder();
         }
 
         @Override

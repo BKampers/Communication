@@ -55,6 +55,11 @@ public class SerialPortChannel extends Channel
             throw new ChannelException(ex);
         }
     }
+
+    @Override
+    public boolean isOpened() {
+        return inputStream != null;
+    }
     
     
     public void setBaudrate(int baudrate) {
@@ -64,6 +69,7 @@ public class SerialPortChannel extends Channel
     
     @Override
     public void close() throws ChannelException {
+        super.close();
         if (port != null) {
             port.removeEventListener();
             port.close();
@@ -71,7 +77,6 @@ public class SerialPortChannel extends Channel
         }
         inputStream = null;
         outputStream = null;
-        super.close();
     }
     
     

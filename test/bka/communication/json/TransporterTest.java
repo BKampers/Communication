@@ -5,7 +5,6 @@
 package bka.communication.json;
 
 import bka.communication.*;
-import org.json.*;
 import static org.junit.Assert.assertEquals;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -44,29 +43,6 @@ public class TransporterTest {
     }
 
 
-    @Test
-    public void testSend() {
-        Channel channelMock = Mockito.mock(TestChannel.class);
-        Transporter transporter = new Transporter(channelMock, applicationName);
-        JSONObject message = new JSONObject();
-        byte[] expected = (message.toString() + '\n').getBytes();
-        transporter.send(message);
-        Mockito.verify(channelMock, Mockito.times(1)).send(expected);
-    }
-
-
-    @Test
-    public void testReceive() throws InterruptedException, ChannelException {
-        byte[] bytes = "{}\n".getBytes();
-        TestChannel testChannel = new TestChannel();
-        Transporter transporter = new Transporter(testChannel, applicationName);
-        transporter.open();
-        testChannel.receive(bytes);
-        JSONObject received = transporter.nextReceivedObject();
-        assertEquals(0, received.length());
-    }
-
-
     private class TestChannel extends Channel {
 
         @Override
@@ -79,6 +55,11 @@ public class TransporterTest {
 
         void receive(byte[] bytes) {
             notifyListeners(bytes);
+        }
+
+        @Override
+        public boolean isOpened() {
+            throw new UnsupportedOperationException("Not required for this test.");
         }
 
     }

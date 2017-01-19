@@ -14,6 +14,7 @@ import java.util.*;
 public abstract class Channel {
     
     abstract public void open(String name) throws ChannelException;
+    abstract public boolean isOpened();
     abstract public void send(byte[] bytes);
      
 

@@ -49,7 +49,7 @@ public class TerminalPicture extends VertexPicture {
 
     @Override
     protected AbstractEditPanel getEditPanel() {
-        return new JsonTerminal((TerminalVertex) getVertex());
+        return new HistogramPanel((TerminalVertex) getVertex());
     }
 
 

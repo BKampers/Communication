@@ -40,6 +40,7 @@ public class Transporter {
     public void open() throws ChannelException {
         channel.open(applicationName);
         objectReceiver = new ObjectReceiver();
+        timer = new Timer(Transporter.class.getName());
         channel.addListener(objectReceiver);
     }
     
@@ -47,15 +48,18 @@ public class Transporter {
     public void close() throws ChannelException {
         receivedObjects.add(new JSONObject()); // deblock thread waiting in nextReceivedObject
         channel.removeListener(objectReceiver);
+        timer = null;
         objectReceiver = null;
         channel.close();
     }
     
     
     public void send(JSONObject message) {
+        if (! channel.isOpened()) {
+            throw new IllegalStateException();
+        }
         StringBuilder builder = new StringBuilder(message.toString());
         builder.append(endOfTransmission);
-        Timer timer = new Timer();
         timer.schedule(new SendTask(builder.toString().getBytes()), 0, 100);
     }
     
@@ -131,7 +135,9 @@ public class Transporter {
     private final char endOfTransmission;
     private final String applicationName;
 
-    private ChannelListener objectReceiver = null;
+    private Timer timer;
+    private ChannelListener objectReceiver;
+
     
     private final BlockingQueue<JSONObject> receivedObjects = new LinkedBlockingQueue<>();
 

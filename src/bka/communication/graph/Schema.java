@@ -63,15 +63,16 @@ public class Schema extends GraphEditor {
 
 
     @Override
-    protected java.beans.XMLEncoder createEncoder() {
-        java.beans.XMLEncoder encoder = super.createEncoder();
-        encoder.setPersistenceDelegate(ChannelVertex.class, ChannelVertex.PERSISTENCE_DELEGATE);
-        return encoder;
+    protected Map<Class, java.beans.PersistenceDelegate> getPersistenceDelegates() {
+        Map<Class, java.beans.PersistenceDelegate> persistenceDelegates = new HashMap<>();
+        persistenceDelegates.put(ChannelVertex.class, ChannelVertex.PERSISTENCE_DELEGATE);
+        return persistenceDelegates;
     }
 
 
+
     private void onLoad() {
-        ArrayList<Edge> edges = new ArrayList<>(allEdges());
+        ArrayList<Edge> edges = new ArrayList<>(book.allEdges());
         edges.sort((edge1, edge2) -> { return edgeCompare(edge1, edge2); });
         for (Edge edge : edges) {
             configureVertices(edge);

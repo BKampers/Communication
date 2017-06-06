@@ -18,12 +18,19 @@ public class TransporterPicture extends VertexPicture {
     }
 
 
+    // TODO modify color by highlights
+//    @Override
+//    public void paint(Graphics2D g2d) {
+//        g2d.setColor(((TransporterVertex) getVertex()).getTransporter() == null ? Color.GRAY : drawColor);
+//        g2d.setStroke(stroke);
+//        Path2D polygon = POLYGON.create(xWest(), yNorth(), size.width, size.height);
+//        g2d.fill(polygon);
+//    }
+
+
     @Override
-    public void paint(Graphics2D g2d) {
-        g2d.setColor(((TransporterVertex) getVertex()).getTransporter() == null ? Color.GRAY : drawColor);
-        g2d.setStroke(stroke);
-        Path2D polygon = POLYGON.create(xWest(), yNorth(), size.width, size.height);
-        g2d.fill(polygon);
+    public Shape getShape() {
+        return POLYGON.create(xWest(), yNorth(), size.width, size.height);
     }
 
 

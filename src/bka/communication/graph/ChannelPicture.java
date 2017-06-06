@@ -4,7 +4,6 @@
 
 package bka.communication.graph;
 
-import bka.communication.*;
 import bka.graph.swing.*;
 import java.awt.*;
 import java.awt.geom.*;
@@ -18,11 +17,8 @@ public class ChannelPicture extends VertexPicture {
 
 
     @Override
-    public void paint(Graphics2D g2d) {
-        g2d.setStroke(stroke);
-        g2d.setColor(getColor());
-        Path2D polygon = POLYGON.create(xWest(), yNorth(), size.width, size.height);
-        g2d.fill(polygon);
+    public Shape getShape() {
+        return POLYGON.create(xWest(), yNorth(), size.width, size.height);
     }
 
 
@@ -52,16 +48,17 @@ public class ChannelPicture extends VertexPicture {
     }
 
 
-    private Color getColor() {
-        Channel channel = ((ChannelVertex) getVertex()).getChannel();
-        if (channel != null) {
-            return (channel.isOpened()) ? OPEN_COLOR : Color.RED;
-        }
-        else {
-            return drawColor;
-        }
-
-    }
+    // TODO modify color by highlights
+//    private Color getColor() {
+//        Channel channel = ((ChannelVertex) getVertex()).getChannel();
+//        if (channel != null) {
+//            return (channel.isOpened()) ? OPEN_COLOR : Color.RED;
+//        }
+//        else {
+//            return drawColor;
+//        }
+//
+//    }
 
 
     private static final PolygonFactory POLYGON = new PolygonFactory(

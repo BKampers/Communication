@@ -18,14 +18,20 @@ public class TerminalPicture extends VertexPicture {
     }
 
 
-    @Override
-    public void paint(Graphics2D g2d) {
-        g2d.setColor(((TerminalVertex) getVertex()).getTransporter() == null ? Color.GRAY : drawColor);
-        g2d.setStroke(stroke);
-        Path2D polygon = POLYGON.create(xWest(), yNorth(), size.width, size.height);
-        g2d.fill(polygon);
-    }
+    // TODO modify color by highlights
+//    @Override
+//    public void paint(Graphics2D g2d) {
+//        g2d.setColor(((TerminalVertex) getVertex()).getTransporter() == null ? Color.GRAY : drawColor);
+//        g2d.setStroke(stroke);
+//        Path2D polygon = POLYGON.create(xWest(), yNorth(), size.width, size.height);
+//        g2d.fill(polygon);
+//    }
 
+
+    @Override
+    public Shape getShape() {
+        return POLYGON.create(xWest(), yNorth(), size.width, size.height);
+    }
 
     @Override
     protected void paintIcon(Graphics2D g2d, int width, int height) {

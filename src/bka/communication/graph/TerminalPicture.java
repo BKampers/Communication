@@ -29,7 +29,7 @@ public class TerminalPicture extends VertexPicture {
 
 
     @Override
-    public Shape getShape() {
+    protected Shape buildShape() {
         return POLYGON.create(xWest(), yNorth(), size.width, size.height);
     }
 

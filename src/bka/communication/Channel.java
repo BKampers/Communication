@@ -4,53 +4,49 @@ package bka.communication;
 import java.util.*;
 
 /**
- * This class sends commands through any channel to which an ASE system is connected 
- * and listens to it for receiving responses. ChannelListeners are notified when a 
- * command has arrived.
+ * This class sends commands through any Channel
+ * and listens to the Channel for receiving responses.
+ * ChannelListeners are notified when a response has arrived.
  * 
  * This class must be extended for different types of channels such as serial and 
  * parallel ports.
  */
-public abstract class Channel
-{
+public abstract class Channel {
     
     abstract public void open(String name) throws ChannelException;
+    abstract public boolean isOpened();
     abstract public void send(byte[] bytes);
      
 
     public void addListener(ChannelListener listener) {
-        if (! listeners.contains(listener)) {
-            listeners.addElement(listener);
-        }
+        listeners.add(listener);
     }
 
 
     public void removeListener(ChannelListener listener) {
-        listeners.removeElement(listener);
+        listeners.remove(listener);
     }
 
     
     public void close() throws ChannelException {
-        listeners.removeAllElements();
+        listeners.clear();
     }
 
    
     protected void notifyListeners(byte[] bytes) {
-        Enumeration en = listeners.elements();
-        while (en.hasMoreElements()) {
-            ((ChannelListener) en.nextElement()).receive(bytes);
+        for (ChannelListener listener : listeners) {
+            listener.receive(bytes);
         }
     }
     
     
     protected void notifyListeners(Exception e) {
-        Enumeration en = listeners.elements();
-        while (en.hasMoreElements()) {
-            ((ChannelListener) en.nextElement()).handleException(e);
+        for (ChannelListener listener : listeners) {
+            listener.handleException(e);
         }
     }
 
 
-    private Vector listeners = new Vector();
+    private final Set<ChannelListener> listeners = new LinkedHashSet<>();
 
 }

@@ -1,7 +1,6 @@
 package communication.swing;
 
 
-import bka.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
@@ -12,7 +11,7 @@ import gnu.io.*;
 import java.util.logging.*;
 
 
-public class MonitorConsole extends FrameApplication {
+public class MonitorConsole extends JFrame {
     
     public MonitorConsole() {
         getContentPane().setLayout(new BorderLayout());
@@ -119,7 +118,6 @@ public class MonitorConsole extends FrameApplication {
     }
 
 
- 
     static public void main(String args[]) {
         try {
             (new MonitorConsole()).setVisible(true);
@@ -128,18 +126,6 @@ public class MonitorConsole extends FrameApplication {
             Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "main", t);
             System.exit(1);
         }
-    }
-
-    
-    @Override
-    public String manufacturerName() {
-        return "BKa";
-    }
-
-    
-    @Override
-    public String applicationName() {
-        return "Monitor Console";
     }
 
     

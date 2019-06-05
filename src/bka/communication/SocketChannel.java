@@ -40,12 +40,6 @@ public class SocketChannel extends Channel {
         }
     }
 
-
-    @Override
-    public boolean isOpened() {
-        return in != null;
-    }
-
     
     @Override
     public void send(byte[] bytes) {
@@ -55,18 +49,14 @@ public class SocketChannel extends Channel {
     
     @Override
     public void close() throws ChannelException {
-        super.close();
         try {
             receiver.stop();
             out.close();
             in.close();
+            super.close();
         }
         catch (IOException ex) {
             throw new ChannelException(ex);
-        }
-        finally {
-            out = null;
-            in = null;
         }
     }
     

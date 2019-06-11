@@ -1,6 +1,7 @@
 package communication.swing;
 
 
+import bka.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
@@ -11,12 +12,12 @@ import gnu.io.*;
 import java.util.logging.*;
 
 
-public class MonitorConsole extends JFrame {
+public class MonitorConsole extends FrameApplication {
+    
     
     public MonitorConsole() {
         getContentPane().setLayout(new BorderLayout());
-        setBackground(java.awt.Color.white);
-        setSize(600, 500);
+        setBackground(java.awt.Color.WHITE);
         JPanel sendPanel = new JPanel();
         sendText.setPreferredSize(new Dimension(430, 25));
         sendPanel.add(sendText);
@@ -37,6 +38,7 @@ public class MonitorConsole extends JFrame {
         portComboBox.setPreferredSize(new Dimension(75, 25));
         choicePanel.add(portComboBox, BorderLayout.NORTH);
         baudComboBox.setPreferredSize(new Dimension(75, 25));
+        baudComboBox.setMaximumRowCount(BAUD_RATES.length);
         choicePanel.add(baudComboBox);
         textJRadioButton = new JRadioButton("Text", true);
         byteJRadioButton = new JRadioButton("Byte", false);
@@ -62,8 +64,7 @@ public class MonitorConsole extends JFrame {
         fileMenu.add(saveAsMenuItem);
         saveAsMenuItem.setEnabled(false);
         saveAsMenuItem.setText("Save As...");
-        fileMenu.add(separatorMenuItem);
-        separatorMenuItem.setText("-");
+        fileMenu.addSeparator();
         fileMenu.add(exitMenuItem);
         exitMenuItem.setText("Exit");
         mainMenuBar.add(fileMenu);
@@ -84,31 +85,28 @@ public class MonitorConsole extends JFrame {
 
         setJMenuBar(mainMenuBar);
 
-        MonitorWindowAdapter aSymWindow = new MonitorWindowAdapter();
-        this.addWindowListener(aSymWindow);
-        ComponentActionListener lSymAction = new ComponentActionListener();
-        openMenuItem.addActionListener(lSymAction);
-        exitMenuItem.addActionListener(lSymAction);
-        ComboBoxItemListener lSymItem = new ComboBoxItemListener();
-        portComboBox.addItemListener(lSymItem);
-        sendButton.addActionListener(lSymAction);
-        sendText.addActionListener(lSymAction);
-        saveMenuItem.addActionListener(lSymAction);
-        baudComboBox.addItemListener(lSymItem);
-        textJRadioButton.addItemListener(lSymItem);
-        byteJRadioButton.addItemListener(lSymItem);
 
         findPorts();
-        baudComboBox.addItem("115200");
-        baudComboBox.addItem("57600");
-        baudComboBox.addItem("38400");
-        baudComboBox.addItem("19200");
-        baudComboBox.addItem("9600");
-        baudComboBox.addItem("4800");
-        baudComboBox.addItem("2400");
-        baudComboBox.addItem("1200");
+        for (int baudRate : BAUD_RATES) {
+            baudComboBox.addItem(baudRate);
+        }
         
         pack();
+        
+        MonitorWindowAdapter windowAdapter = new MonitorWindowAdapter();
+        this.addWindowListener(windowAdapter);
+        ComponentActionListener actionListener = new ComponentActionListener();
+        sendButton.addActionListener(actionListener);
+        sendText.addActionListener(actionListener);
+        saveMenuItem.addActionListener(actionListener);
+        openMenuItem.addActionListener(actionListener);
+        exitMenuItem.addActionListener(actionListener);
+        ComponentItemListener itemListener = new ComponentItemListener();
+        portComboBox.addItemListener(itemListener);
+        baudComboBox.addItemListener(itemListener);
+        textJRadioButton.addItemListener(itemListener);
+        byteJRadioButton.addItemListener(itemListener);
+        
     }
 
     
@@ -118,9 +116,13 @@ public class MonitorConsole extends JFrame {
     }
 
 
-    static public void main(String args[]) {
+    public static void main(String args[]) {
         try {
-            (new MonitorConsole()).setVisible(true);
+            MonitorConsole console = new MonitorConsole();
+            console.parseArguments(args);
+            console.baudComboBox.setSelectedItem(Integer.parseInt(console.getProperty(BAUD_PROPERTY_KEY)));
+            console.portComboBox.setSelectedItem(console.getProperty(PORT_PROPERTY_KEY));
+            console.setVisible(true);
         }
         catch (Throwable t) {
             Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "main", t);
@@ -130,10 +132,19 @@ public class MonitorConsole extends JFrame {
 
     
     @Override
+    public String manufacturerName() {
+        return "Bka";
+    }
+
+    
+    @Override
+    public String applicationName() {
+        return "Monitor Console";
+    }
+
+    
+   @Override
     public void setVisible(boolean visible) {
-        if (visible) {
-            setLocation(50, 50);
-        }	
         super.setVisible(visible);
     }
 
@@ -202,19 +213,19 @@ public class MonitorConsole extends JFrame {
 
     private void portComboBox_itemStateChanged(ItemEvent event) {
         String selected = (String) event.getItem();
-        if (event.getStateChange() == ItemEvent.SELECTED) {
-            if (! selected.equals("-")) {
-                openSerialPort((CommPortIdentifier) tableOfPorts.get(selected));
-            }
-            else {
-                openSerialPort(null);
-            }
+        setProperty(PORT_PROPERTY_KEY, selected);
+        if (! NO_SELECTION.equals(selected)) {
+            openSerialPort((CommPortIdentifier) tableOfPorts.get(selected));
+        }
+        else {
+            openSerialPort(null);
         }
     }
 
 
     private void baudComboBox_itemStateChanged(ItemEvent event) {
         if (serialPort != null) {
+            setProperty(BAUD_PROPERTY_KEY, event.getItem().toString());
             setSerialPortParams();
         }
     }
@@ -265,7 +276,7 @@ public class MonitorConsole extends JFrame {
 
 
     private void findPorts() {
-        portComboBox.addItem("-");
+        portComboBox.addItem(NO_SELECTION);
         Enumeration portList = CommPortIdentifier.getPortIdentifiers();
         while (portList.hasMoreElements()) {
             CommPortIdentifier portId = (CommPortIdentifier) portList.nextElement();
@@ -361,18 +372,20 @@ public class MonitorConsole extends JFrame {
     }
 
 
-    private class ComboBoxItemListener implements ItemListener {
+    private class ComponentItemListener implements ItemListener {
         
         @Override
         public void itemStateChanged(ItemEvent event) {
-            Object object = event.getSource();
-            if (object == portComboBox) {
-                portComboBox_itemStateChanged(event);
+            if (event.getStateChange() == ItemEvent.SELECTED) {
+                Object object = event.getSource();
+                if (object == portComboBox) {
+                    portComboBox_itemStateChanged(event);
+                }
+                else if (object == baudComboBox) {
+                    baudComboBox_itemStateChanged(event);
+                }
+                sendText.requestFocus();
             }
-            else if (object == baudComboBox) {
-                baudComboBox_itemStateChanged(event);
-            }
-            sendText.requestFocus();
         }
         
     }
@@ -472,7 +485,6 @@ public class MonitorConsole extends JFrame {
     private final JMenuItem openMenuItem = new JMenuItem();
     private final JMenuItem saveMenuItem = new JMenuItem();
     private final JMenuItem saveAsMenuItem = new JMenuItem();
-    private final JMenuItem separatorMenuItem = new JMenuItem();
     private final JMenuItem exitMenuItem = new JMenuItem();
     private final JMenu editMenu = new JMenu();
     private final JMenuItem cutMenuItem = new JMenuItem();
@@ -497,5 +509,25 @@ public class MonitorConsole extends JFrame {
     
     private static final String CR = "\n\r";
 
-}
+    private static final String PORT_PROPERTY_KEY = "port";
+    private static final String BAUD_PROPERTY_KEY = "baud";
+    
+    private static final String NO_SELECTION = "-";
+    
+    private static final int[] BAUD_RATES = {
+        256000,
+        128000,
+        115200,
+        57600,
+        38400,
+        19200,
+        14400,
+        9600,
+        4800,
+        2400,
+        1200,
+        600,
+        300,
+        110 };
 
+}

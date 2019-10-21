@@ -2,20 +2,31 @@ package communication.swing;
 
 
 import bka.swing.*;
+import gnu.io.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.util.*;
 import java.io.*;
+import java.util.*;
+import java.util.logging.*;
 import javax.swing.*;
 import javax.swing.event.*;
-import gnu.io.*;
-import java.util.logging.*;
 
 
 public class MonitorConsole extends FrameApplication {
     
     
     public MonitorConsole() {
+        initComponents();
+        initMenus();
+        findPorts();
+        for (int baudRate : BAUD_RATES) {
+            baudComboBox.addItem(baudRate);
+        }
+        initListeners();
+    }
+
+
+    private void initComponents() {
         getContentPane().setLayout(new BorderLayout());
         setBackground(java.awt.Color.WHITE);
         JPanel sendPanel = new JPanel();
@@ -35,9 +46,9 @@ public class MonitorConsole extends FrameApplication {
         receivePane.getViewport().add(receivedText);
         getContentPane().add(receivePane, BorderLayout.CENTER);
         JPanel choicePanel = new JPanel();
-        portComboBox.setPreferredSize(new Dimension(75, 25));
+        portComboBox.setPreferredSize(new Dimension(225, 25));
         choicePanel.add(portComboBox, BorderLayout.NORTH);
-        baudComboBox.setPreferredSize(new Dimension(75, 25));
+        baudComboBox.setPreferredSize(new Dimension(100, 25));
         baudComboBox.setMaximumRowCount(BAUD_RATES.length);
         choicePanel.add(baudComboBox);
         textJRadioButton = new JRadioButton("Text", true);
@@ -47,9 +58,13 @@ public class MonitorConsole extends FrameApplication {
         buttonGroup.add(byteJRadioButton);
         choicePanel.add(textJRadioButton);
         choicePanel.add(byteJRadioButton);
-        getContentPane().add(choicePanel, BorderLayout.NORTH); 
+        getContentPane().add(choicePanel, BorderLayout.NORTH);
         setTitle("COM Monitor");
+        pack();
+    }
 
+
+    private void initMenus() {
         fileMenu.setText("File");
         fileMenu.add(newMenuItem);
         newMenuItem.setEnabled(false);
@@ -81,20 +96,13 @@ public class MonitorConsole extends FrameApplication {
         pasteMenuItem.setEnabled(false);
         pasteMenuItem.setText("Paste");
         pasteMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.CTRL_MASK));
-        mainMenuBar.add(editMenu);
-
+        mainMenuBar.add(editMenu);     
         setJMenuBar(mainMenuBar);
+    }
 
-
-        findPorts();
-        for (int baudRate : BAUD_RATES) {
-            baudComboBox.addItem(baudRate);
-        }
-        
-        pack();
-        
-        MonitorWindowAdapter windowAdapter = new MonitorWindowAdapter();
-        this.addWindowListener(windowAdapter);
+ 
+    private void initListeners() {
+        addWindowListener(new MonitorWindowAdapter());
         ComponentActionListener actionListener = new ComponentActionListener();
         sendButton.addActionListener(actionListener);
         sendText.addActionListener(actionListener);
@@ -106,13 +114,6 @@ public class MonitorConsole extends FrameApplication {
         baudComboBox.addItemListener(itemListener);
         textJRadioButton.addItemListener(itemListener);
         byteJRadioButton.addItemListener(itemListener);
-        
-    }
-
-    
-    public MonitorConsole(String title) {
-        this();
-        setTitle(title);
     }
 
 
@@ -120,12 +121,15 @@ public class MonitorConsole extends FrameApplication {
         try {
             MonitorConsole console = new MonitorConsole();
             console.parseArguments(args);
-            console.baudComboBox.setSelectedItem(Integer.parseInt(console.getProperty(BAUD_PROPERTY_KEY)));
+            String baud = console.getProperty(BAUD_PROPERTY_KEY);
+            if (baud != null) {
+                console.baudComboBox.setSelectedItem(Integer.parseInt(console.getProperty(BAUD_PROPERTY_KEY)));
+            }
             console.portComboBox.setSelectedItem(console.getProperty(PORT_PROPERTY_KEY));
             console.setVisible(true);
         }
-        catch (Throwable t) {
-            Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "main", t);
+        catch (NumberFormatException ex) {
+            getLogger().log(Level.SEVERE, "main", ex);
             System.exit(1);
         }
     }
@@ -206,13 +210,13 @@ public class MonitorConsole extends FrameApplication {
     }
 
 
-    private void exitMenuItem_actionPerformed(ActionEvent event) {
+    private void exitMenuItem_actionPerformed(ActionEvent evt) {
         System.exit(0);
     }
 
 
-    private void portComboBox_itemStateChanged(ItemEvent event) {
-        String selected = (String) event.getItem();
+    private void portComboBox_itemStateChanged(ItemEvent evt) {
+        String selected = (String) evt.getItem();
         setProperty(PORT_PROPERTY_KEY, selected);
         if (! NO_SELECTION.equals(selected)) {
             openSerialPort((CommPortIdentifier) tableOfPorts.get(selected));
@@ -223,55 +227,60 @@ public class MonitorConsole extends FrameApplication {
     }
 
 
-    private void baudComboBox_itemStateChanged(ItemEvent event) {
+    private void baudComboBox_itemStateChanged(ItemEvent evt) {
         if (serialPort != null) {
-            setProperty(BAUD_PROPERTY_KEY, event.getItem().toString());
+            setProperty(BAUD_PROPERTY_KEY, evt.getItem().toString());
             setSerialPortParams();
         }
     }
 
 
-    private void sendButton_actionPerformed(ActionEvent event) {
+    private void sendButton_actionPerformed(ActionEvent evt) {
         transmitText(sendText.getText());
     }
 
 
-    private void sendText_actionPerformed(ActionEvent event) {
+    private void sendText_actionPerformed(ActionEvent evt) {
         transmitText(sendText.getText());
     }
 
     
     private void openSerialPort(CommPortIdentifier commPortIdentifier) {
-        if (openedPort != null) {
-            serialPort.close();
+        if (openedPort != null && serialPort != null) {
+            //serialPort.close();
         }
         if (commPortIdentifier != null) {
             try {
-                serialPort = (SerialPort) commPortIdentifier.open("MonitorConsole", 2000);
+                serialPort = (SerialPort) commPortIdentifier.open(MonitorConsole.class.getName(), 2000);
             } 
-            catch (PortInUseException e) {
+            catch (PortInUseException ex) {
                 serialPort = null;
-                System.out.println(e);
+                logOpenPortException(commPortIdentifier, ex);
             }
             if (serialPort != null) {
                 try {
                     outputStream = serialPort.getOutputStream();
                     inputStream = serialPort.getInputStream();
                 } 
-                catch (IOException e) {
-                    System.out.println(e);
+                catch (IOException ex) {
+                    logOpenPortException(commPortIdentifier, ex);
                 }
                 setSerialPortParams();
-            }
-            serialPort.notifyOnDataAvailable(true);
-            try {
-                serialPort.addEventListener(new CommPortListener());
-            }
-            catch (TooManyListenersException e) {
-                    System.out.println(e);
+                serialPort.notifyOnDataAvailable(true);
+                try {
+                    serialPort.addEventListener(new CommPortListener());
+                }
+                catch (TooManyListenersException ex) {
+                    logOpenPortException(commPortIdentifier, ex);
+                }
+                openedPort = commPortIdentifier;
             }
         }
-        openedPort = commPortIdentifier;
+    }
+
+
+    private void logOpenPortException(CommPortIdentifier commPortIdentifier, Exception exception) {
+        getLogger().log(Level.SEVERE, "Open port " + commPortIdentifier.getName(), exception);
     }
 
 
@@ -281,7 +290,7 @@ public class MonitorConsole extends FrameApplication {
         while (portList.hasMoreElements()) {
             CommPortIdentifier portId = (CommPortIdentifier) portList.nextElement();
             String name = portId.getName();
-            if (name.substring(0, 3).equals("COM")) {
+            if (portFilter == null || name.matches(portFilter)) {
                 tableOfPorts.put(name, portId);
                 portComboBox.addItem(name);
             }
@@ -297,24 +306,25 @@ public class MonitorConsole extends FrameApplication {
                 try {
                     outputStream.write(scanner.nextInt());
                 }
-                catch (NoSuchElementException e) {
+                catch (NoSuchElementException ex) {
+                    getLogger().log(Level.FINEST, "Finised scanning", ex);
                     ready = true;
                 }
-                catch (IOException e) {
-                    JOptionPane.showMessageDialog(this, e.toString(), "Port error", JOptionPane.ERROR_MESSAGE);
+                catch (IOException ex) {
+                    getLogger().log(Level.WARNING, "Finised scanning", ex);
+                    JOptionPane.showMessageDialog(this, ex.toString(), "Port error", JOptionPane.ERROR_MESSAGE);
                     ready = true;
                 }
             }
         }
         else {
             try {
-                text += CR;
-                outputStream.write(text.getBytes());
+                outputStream.write((text + CR).getBytes());
                 sendText.setText("");
             }
-            catch (Throwable t) {
-                System.out.println(t);
-                JOptionPane.showMessageDialog(this, t.toString(), "Port error", JOptionPane.ERROR_MESSAGE); 
+            catch (IOException ex) {
+                getLogger().log(Level.WARNING, "transmit", ex);
+                JOptionPane.showMessageDialog(this, ex.toString(), "Port error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
@@ -329,7 +339,7 @@ public class MonitorConsole extends FrameApplication {
                 SerialPort.PARITY_NONE);
         } 
         catch (NumberFormatException | UnsupportedCommOperationException ex) {
-            Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "setSerialPortParams", ex);
+            getLogger().log(Level.SEVERE, "Set serial port params", ex);
         }
     }
     
@@ -342,6 +352,11 @@ public class MonitorConsole extends FrameApplication {
         }
         return fileChooser;
         
+    }
+
+
+    private static Logger getLogger() {
+        return Logger.getLogger(MonitorConsole.class.getName());
     }
 
 
@@ -421,10 +436,9 @@ public class MonitorConsole extends FrameApplication {
         
         @Override
         public void stateChanged(ChangeEvent e) {
-            // Test for flag. Otherwise, if we scroll unconditionally, 
-            // the scroll bar will be stuck at the bottom even when the 
-            // user tries to drag it. So we only scroll when we know 
-            // we've added text
+            // Test for flag. When scrolling unconditionally,
+            // the scroll bar will get stuck at the bottom even when the
+            // user tries to drag it. So only scroll when text was added.
             if (shouldScroll) {
                 JScrollBar vertBar = receivePane.getVerticalScrollBar();
                 vertBar.setValue(vertBar.getMaximum());
@@ -438,31 +452,31 @@ public class MonitorConsole extends FrameApplication {
     private class CommPortListener implements SerialPortEventListener  {
         
         @Override
-        public void serialEvent(SerialPortEvent ev) {
-            if (ev.getEventType() == SerialPortEvent.DATA_AVAILABLE) {
+        public void serialEvent(SerialPortEvent evt) {
+            if (evt.getEventType() == SerialPortEvent.DATA_AVAILABLE) {
                 try {
                     int available = inputStream.available();
                     byte[] receiveBuffer = new byte[available];
                     inputStream.read(receiveBuffer, 0, receiveBuffer.length);
-                    String received;
+                    StringBuilder received = new StringBuilder();
                     if (byteJRadioButton.isSelected()) {
-                        received = "";
                         for (int i = 0; i < available; i++) {
-                            received += Byte.toString(receiveBuffer[i]) + ' ';
+                            received.append(Byte.toString(receiveBuffer[i]));
+                            received.append(' ');
                         }
-                        received += CR;
+                        received.append(CR);
                     }
                     else {
-                        received = new String(receiveBuffer);
+                        received.append(new String(receiveBuffer));
                     }
-                    receivedText.append(received);
+                    receivedText.append(received.toString());
                     if (receivedText.getText().length() > 50000) {
                         receivedText.replaceRange("", 0, 1000);
                     }
                     shouldScroll = true;
                 }
-                catch (IOException e) {
-                    System.out.println(e);
+                catch (IOException ex) {
+                    getLogger().log(Level.WARNING, evt.toString(), ex);
                 }
             }
         }
@@ -505,6 +519,9 @@ public class MonitorConsole extends FrameApplication {
     private final Map<String, CommPortIdentifier> tableOfPorts = new HashMap<>();
 
     private boolean shouldScroll = false;
+
+
+    private final String portFilter = ".*cu.usbserial.*";
     
     
     private static final String CR = "\n\r";
@@ -515,8 +532,8 @@ public class MonitorConsole extends FrameApplication {
     private static final String NO_SELECTION = "-";
     
     private static final int[] BAUD_RATES = {
-        256000,
-        128000,
+        460800,
+        230400,
         115200,
         57600,
         38400,
@@ -528,6 +545,11 @@ public class MonitorConsole extends FrameApplication {
         1200,
         600,
         300,
-        110 };
+        200,
+        150,
+        134,
+        110,
+        75,
+        50};
 
 }

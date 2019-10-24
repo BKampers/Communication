@@ -63,3 +63,4 @@ $RECYCLE.BIN/
 *.msp
 win32com.dll
 /properties
+/configuration.json

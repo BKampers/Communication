@@ -10,6 +10,7 @@ import java.util.*;
 import java.util.logging.*;
 import javax.swing.*;
 import javax.swing.event.*;
+import org.json.*;
 
 
 public class MonitorConsole extends FrameApplication {
@@ -19,10 +20,23 @@ public class MonitorConsole extends FrameApplication {
         initComponents();
         initMenus();
         findPorts();
-        for (int baudRate : BAUD_RATES) {
+        for (int baudRate : getBaudRates()) {
             baudComboBox.addItem(baudRate);
         }
         initListeners();
+    }
+
+  
+    private int[] getBaudRates() {
+        JSONArray configurationRates = getConfigurationArray("baud_rates");
+        if (configurationRates == null) {
+            return DEFAULT_BAUD_RATES;
+        }
+        int[] baudRates = new int[configurationRates.length()];
+        for (int i = 0; i < configurationRates.length(); ++i) {
+            baudRates[i] = configurationRates.optInt(i);
+        }
+        return baudRates;
     }
 
 
@@ -49,7 +63,6 @@ public class MonitorConsole extends FrameApplication {
         portComboBox.setPreferredSize(new Dimension(225, 25));
         choicePanel.add(portComboBox, BorderLayout.NORTH);
         baudComboBox.setPreferredSize(new Dimension(100, 25));
-        baudComboBox.setMaximumRowCount(BAUD_RATES.length);
         choicePanel.add(baudComboBox);
         textJRadioButton = new JRadioButton("Text", true);
         byteJRadioButton = new JRadioButton("Byte", false);
@@ -247,7 +260,7 @@ public class MonitorConsole extends FrameApplication {
     
     private void openSerialPort(CommPortIdentifier commPortIdentifier) {
         if (openedPort != null && serialPort != null) {
-            //serialPort.close();
+            serialPort.close();
         }
         if (commPortIdentifier != null) {
             try {
@@ -285,6 +298,7 @@ public class MonitorConsole extends FrameApplication {
 
 
     private void findPorts() {
+        String portFilter = getConfigurationString("port_filter");
         portComboBox.addItem(NO_SELECTION);
         Enumeration portList = CommPortIdentifier.getPortIdentifiers();
         while (portList.hasMoreElements()) {
@@ -520,9 +534,6 @@ public class MonitorConsole extends FrameApplication {
 
     private boolean shouldScroll = false;
 
-
-    private final String portFilter = ".*cu.usbserial.*";
-    
     
     private static final String CR = "\n\r";
 
@@ -531,25 +542,6 @@ public class MonitorConsole extends FrameApplication {
     
     private static final String NO_SELECTION = "-";
     
-    private static final int[] BAUD_RATES = {
-        460800,
-        230400,
-        115200,
-        57600,
-        38400,
-        19200,
-        14400,
-        9600,
-        4800,
-        2400,
-        1200,
-        600,
-        300,
-        200,
-        150,
-        134,
-        110,
-        75,
-        50};
+    private static final int[] DEFAULT_BAUD_RATES = { 115200, 19200, 9600, 4800 };
 
 }

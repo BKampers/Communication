@@ -64,3 +64,4 @@ $RECYCLE.BIN/
 win32com.dll
 /properties
 /configuration.json
+/dialogs

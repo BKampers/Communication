@@ -1,11 +1,13 @@
 package communication.swing;
 
 
+import bka.communication.*;
 import bka.swing.*;
 import gnu.io.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
+import java.net.*;
 import java.util.*;
 import java.util.logging.*;
 import javax.swing.*;
@@ -115,6 +117,7 @@ public class MonitorConsole extends FrameApplication {
 
  
     private void initListeners() {
+        setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         addWindowListener(new MonitorWindowAdapter());
         ComponentActionListener actionListener = new ComponentActionListener();
         sendButton.addActionListener(actionListener);
@@ -391,13 +394,67 @@ public class MonitorConsole extends FrameApplication {
     
     private class MonitorWindowAdapter extends WindowAdapter
     {
+
         @Override
-        public void windowClosing(java.awt.event.WindowEvent event) {
-            Object object = event.getSource();
-            if (object == MonitorConsole.this) {
-                System.exit(0);
+        public void windowOpened(WindowEvent evt) {
+            loadPlugins();
+            for (Plugin plugin : plugins) {
+                openPluginPanel(plugin.getView());
             }
         }
+
+        private void openPluginPanel(JPanel panel) {
+            if (panel != null) {
+                JDialog dialog = new CustomDialog(MonitorConsole.this, panel.getName(), panel, false);
+                Dimension d = panel.getPreferredSize();
+                dialog.setPreferredSize(panel.getPreferredSize());
+                dialog.getContentPane().add(panel);
+                dialog.pack();
+                dialog.setVisible(true);
+            }
+        }
+
+        private void loadPlugins() {
+            URL[] classUrls = null;
+            JSONArray pluginPaths = getConfigurationArray("plugin-paths");
+            if (pluginPaths != null) {
+                classUrls = new URL[pluginPaths.length()];
+                for (int i = 0; i < pluginPaths.length(); ++i) {
+                    try {
+                        classUrls[i] = new URL(pluginPaths.getString(i));
+                    }
+                    catch (JSONException | MalformedURLException ex) {
+                        Logger.getLogger(MonitorConsole.class.getName()).log(Level.WARNING, "Configuration", ex);
+                    }
+                }
+            }
+            URLClassLoader ucl = new URLClassLoader(classUrls);
+            JSONArray pluginClassNames = getConfigurationArray("plugins");
+            if (pluginClassNames != null) {
+                for (int i = 0; i < pluginClassNames.length(); ++i) {
+                    try {
+                        String name = pluginClassNames.getString(i);
+                        Class pluginClass = ucl.loadClass(name);
+                        Plugin plugin = (Plugin) pluginClass.newInstance();
+                        plugins.add(plugin);
+                    }
+                    catch (JSONException | ReflectiveOperationException ex) {
+                        Logger.getLogger(MonitorConsole.class.getName()).log(Level.WARNING, "Configuration", ex);
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void windowClosing(WindowEvent evt) {
+            for (Window window : getOwnedWindows()) {
+                if (window instanceof AbstractDialog) {
+                    window.dispose();
+                }
+            }
+            AbstractDialog.store(MonitorConsole.this);
+        }
+
     }
 
 
@@ -474,7 +531,7 @@ public class MonitorConsole extends FrameApplication {
                     inputStream.read(receiveBuffer, 0, receiveBuffer.length);
                     StringBuilder received = new StringBuilder();
                     if (byteJRadioButton.isSelected()) {
-                        for (int i = 0; i < available; i++) {
+                        for (int i = 0; i < available; ++i) {
                             received.append(Byte.toString(receiveBuffer[i]));
                             received.append(' ');
                         }
@@ -488,6 +545,9 @@ public class MonitorConsole extends FrameApplication {
                         receivedText.replaceRange("", 0, 1000);
                     }
                     shouldScroll = true;
+                    for (Plugin plugin : plugins) {
+                        plugin.receive(receiveBuffer);
+                    }
                 }
                 catch (IOException ex) {
                     getLogger().log(Level.WARNING, evt.toString(), ex);
@@ -525,12 +585,13 @@ public class MonitorConsole extends FrameApplication {
     private JRadioButton textJRadioButton;
     private JRadioButton byteJRadioButton;
     
-    private CommPortIdentifier openedPort = null;
+    private CommPortIdentifier openedPort;
     private SerialPort serialPort;
     private OutputStream outputStream;
     private InputStream inputStream;
 
     private final Map<String, CommPortIdentifier> tableOfPorts = new HashMap<>();
+    private final Collection<Plugin> plugins = new ArrayList<>();
 
     private boolean shouldScroll = false;
 

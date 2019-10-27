@@ -546,7 +546,13 @@ public class MonitorConsole extends FrameApplication {
                     }
                     shouldScroll = true;
                     for (Plugin plugin : plugins) {
-                        plugin.receive(receiveBuffer);
+                        try {
+                            plugin.receive(receiveBuffer);
+                            plugin.updateView();
+                        }
+                        catch (RuntimeException ex) {
+                            getLogger().log(Level.WARNING, evt.toString(), ex);
+                        }
                     }
                 }
                 catch (IOException ex) {

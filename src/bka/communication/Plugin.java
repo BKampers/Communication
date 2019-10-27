@@ -25,4 +25,6 @@ public interface Plugin {
      */
     JPanel getView();
 
+    void updateView();
+
 }

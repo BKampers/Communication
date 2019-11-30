@@ -9,6 +9,7 @@ import java.awt.event.*;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.logging.*;
 import javax.swing.*;
 import javax.swing.event.*;
@@ -171,21 +172,23 @@ public class MonitorConsole extends FrameApplication {
 
     @Override
     public void addNotify() {
-        // Record the size of the window prior to calling parents addNotify.
-        Dimension dimension = getSize();
+        Dimension size = getSize(); // Record the size of the window prior to calling parent's addNotify.
         super.addNotify();
-        if (componentsAdjusted) {
-            return;
+        if (! componentsAdjusted) {
+            adjustToInsets(size);
+            componentsAdjusted = true;
         }
-        // Adjust components according to the insets
-        setSize(getInsets().left + getInsets().right + dimension.width, getInsets().top + getInsets().bottom + dimension.height);
-        Component components[] = getComponents();
-        for (Component component : components) {
-            Point point = component.getLocation();
-            point.translate(getInsets().left, getInsets().top);
-            component.setLocation(point);
+    }
+
+
+    private void adjustToInsets(Dimension dimension) {
+        Insets insets = getInsets();
+        setSize(insets.left + insets.right + dimension.width, insets.top + insets.bottom + dimension.height);
+        for (Component component : getComponents()) {
+            Point location = component.getLocation();
+            location.translate(insets.left, insets.top);
+            component.setLocation(location);
         }
-        componentsAdjusted = true;
     }
 
     
@@ -208,7 +211,7 @@ public class MonitorConsole extends FrameApplication {
     }
 
 
-    private void saveMenuItem_actionPerformed(ActionEvent event) {
+    private void saveMenuItem_actionPerformed(ActionEvent evt) {
         JFileChooser fileChooser = createFileChooser();
         fileChooser.setDialogType(JFileChooser.SAVE_DIALOG);
         fileChooser.showSaveDialog(this);
@@ -396,8 +399,9 @@ public class MonitorConsole extends FrameApplication {
         @Override
         public void windowOpened(WindowEvent evt) {
             loadPlugins();
-            for (Plugin plugin : plugins) {
-                openPluginPanel(plugin.getView());
+            for (Task task : tasks) {
+                openPluginPanel(task.getPlugin().getView());
+                task.start();
             }
         }
 
@@ -434,7 +438,7 @@ public class MonitorConsole extends FrameApplication {
                         String name = pluginClassNames.getString(i);
                         Class pluginClass = ucl.loadClass(name);
                         Plugin plugin = (Plugin) pluginClass.newInstance();
-                        plugins.add(plugin);
+                        tasks.add(new Task(plugin));
                     }
                     catch (JSONException | ReflectiveOperationException ex) {
                         Logger.getLogger(MonitorConsole.class.getName()).log(Level.WARNING, "Configuration", ex);
@@ -504,7 +508,7 @@ public class MonitorConsole extends FrameApplication {
     private class ScrollChangeListener implements ChangeListener {
         
         @Override
-        public void stateChanged(ChangeEvent e) {
+        public void stateChanged(ChangeEvent evt) {
             // Test for flag. When scrolling unconditionally,
             // the scroll bar will get stuck at the bottom even when the
             // user tries to drag it. So only scroll when text was added.
@@ -524,12 +528,12 @@ public class MonitorConsole extends FrameApplication {
         public void serialEvent(SerialPortEvent evt) {
             if (evt.getEventType() == SerialPortEvent.DATA_AVAILABLE) {
                 try {
-                    int available = inputStream.available();
-                    byte[] receiveBuffer = new byte[available];
-                    inputStream.read(receiveBuffer, 0, receiveBuffer.length);
+                    final int receiveCount = inputStream.available();
+                    byte[] receiveBuffer = new byte[receiveCount];
+                    inputStream.read(receiveBuffer, 0, receiveCount);
                     StringBuilder received = new StringBuilder();
                     if (byteJRadioButton.isSelected()) {
-                        for (int i = 0; i < available; ++i) {
+                        for (int i = 0; i < receiveCount; ++i) {
                             received.append(Byte.toString(receiveBuffer[i]));
                             received.append(' ');
                         }
@@ -543,14 +547,8 @@ public class MonitorConsole extends FrameApplication {
                         receivedText.replaceRange("", 0, 1000);
                     }
                     shouldScroll = true;
-                    for (Plugin plugin : plugins) {
-                        try {
-                            plugin.receive(receiveBuffer);
-                            plugin.updateView();
-                        }
-                        catch (RuntimeException ex) {
-                            getLogger().log(Level.WARNING, evt.toString(), ex);
-                        }
+                    for (Task task : tasks) {
+                        task.notify(Arrays.copyOf(receiveBuffer, receiveCount));
                     }
                 }
                 catch (IOException ex) {
@@ -560,11 +558,52 @@ public class MonitorConsole extends FrameApplication {
         }
 
     }
-    
-    
-    // Used for addNotify check.
-    private boolean componentsAdjusted = false;
 
+
+    private class Task {
+
+        Task(Plugin plugin) {
+            this.plugin = plugin;
+        }
+
+        void start() {
+            thread = new Thread(new Runnable() {
+                @Override // TODO use lambda when sure Java 8 can be used
+                public void run() {
+                    runTask();
+                }
+            }, "Monitor Console plugin");
+            thread.start();
+        }
+
+        private void runTask() {
+            while (true) {
+                try {
+                    plugin.receive(receiveQueue.take());
+                    plugin.updateView();
+                }
+                catch (InterruptedException | RuntimeException ex) {
+                    getLogger().log(Level.WARNING, plugin.getClass().getName(), ex);
+                }
+            }
+        }
+
+        Plugin getPlugin() {
+            return plugin;
+        }
+
+        void notify(byte[] data) {
+            receiveQueue.add(data);
+        }
+
+        private final Plugin plugin;
+        private final BlockingQueue<byte[]> receiveQueue = new LinkedBlockingQueue<>();
+        private Thread thread;
+
+    }
+
+
+    private boolean componentsAdjusted = false; // used by addNotify
     private final JTextField sendText = new JTextField();
     private final JTextArea receivedText = new JTextArea();
     private final JButton sendButton = new JButton();
@@ -595,7 +634,7 @@ public class MonitorConsole extends FrameApplication {
     private InputStream inputStream;
 
     private final Map<String, CommPortIdentifier> tableOfPorts = new HashMap<>();
-    private final Collection<Plugin> plugins = new ArrayList<>();
+    private final Collection<Task> tasks = new ArrayList<>();
 
     private boolean shouldScroll = false;
 

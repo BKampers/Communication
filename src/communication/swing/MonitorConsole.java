@@ -317,22 +317,7 @@ public class MonitorConsole extends FrameApplication {
 
     private void transmitText(String text) {
         if (byteJRadioButton.isSelected()) {
-            boolean ready = false;
-            Scanner scanner = new Scanner(text);
-            while (! ready) {
-                try {
-                    outputStream.write(scanner.nextInt());
-                }
-                catch (NoSuchElementException ex) {
-                    getLogger().log(Level.FINEST, "Finised scanning", ex);
-                    ready = true;
-                }
-                catch (IOException ex) {
-                    getLogger().log(Level.WARNING, "Finised scanning", ex);
-                    JOptionPane.showMessageDialog(this, ex.toString(), "Port error", JOptionPane.ERROR_MESSAGE);
-                    ready = true;
-                }
-            }
+            transmitBytes(text);
         }
         else {
             try {
@@ -342,6 +327,19 @@ public class MonitorConsole extends FrameApplication {
             catch (IOException ex) {
                 getLogger().log(Level.WARNING, "transmit", ex);
                 JOptionPane.showMessageDialog(this, ex.toString(), "Port error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void transmitBytes(String text) {
+        Scanner scanner = new Scanner(text);
+        while (scanner.hasNextInt()) {
+            try {
+                outputStream.write(scanner.nextInt());
+            }
+            catch (NoSuchElementException | IOException ex) {
+                getLogger().log(Level.WARNING, "Scanning", ex);
+                JOptionPane.showMessageDialog(this, ex.toString(), "Transmit error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }

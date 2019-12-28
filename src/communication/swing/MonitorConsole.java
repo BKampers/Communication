@@ -417,26 +417,13 @@ public class MonitorConsole extends FrameApplication {
         }
 
         private void loadPlugins() {
-            URL[] classUrls = null;
-            JSONArray pluginPaths = getConfigurationArray("plugin-paths");
-            if (pluginPaths != null) {
-                classUrls = new URL[pluginPaths.length()];
-                for (int i = 0; i < pluginPaths.length(); ++i) {
-                    try {
-                        classUrls[i] = new URL(pluginPaths.getString(i));
-                    }
-                    catch (JSONException | MalformedURLException ex) {
-                        Logger.getLogger(MonitorConsole.class.getName()).log(Level.WARNING, "Configuration", ex);
-                    }
-                }
-            }
-            URLClassLoader ucl = new URLClassLoader(classUrls);
             JSONArray pluginClassNames = getConfigurationArray("plugins");
             if (pluginClassNames != null) {
+                URLClassLoader classLoader = new URLClassLoader(loadCLassUrls());
                 for (int i = 0; i < pluginClassNames.length(); ++i) {
                     try {
                         String name = pluginClassNames.getString(i);
-                        Class pluginClass = ucl.loadClass(name);
+                        Class pluginClass = classLoader.loadClass(name);
                         Plugin plugin = (Plugin) pluginClass.newInstance();
                         tasks.add(new Task(plugin));
                     }
@@ -445,6 +432,23 @@ public class MonitorConsole extends FrameApplication {
                     }
                 }
             }
+        }
+
+        private URL[] loadCLassUrls() {
+            JSONArray pluginPaths = getConfigurationArray("plugin-paths");
+            if (pluginPaths == null) {
+                return null;
+            }
+            URL[] classUrls = new URL[pluginPaths.length()];
+            for (int i = 0; i < pluginPaths.length(); ++i) {
+                try {
+                    classUrls[i] = new URL(pluginPaths.getString(i));
+                }
+                catch (JSONException | MalformedURLException ex) {
+                    Logger.getLogger(MonitorConsole.class.getName()).log(Level.WARNING, "Configuration", ex);
+                }
+            }
+            return classUrls;
         }
 
         @Override

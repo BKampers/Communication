@@ -7,6 +7,8 @@ package bka.communication;
 
 import java.io.*;
 import java.net.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 
 public class SocketChannel extends Channel {
@@ -33,7 +35,7 @@ public class SocketChannel extends Channel {
             Thread receiverThread = new Thread(receiver);
             receiverThread.start();
         }
-        catch (Exception ex) {
+        catch (IOException ex) {
             throw new ChannelException(ex);
         }
     }
@@ -41,8 +43,7 @@ public class SocketChannel extends Channel {
     
     @Override
     public void send(byte[] bytes) {
-        String string = new String(bytes) + "\r\n";
-        out.println(string);
+        out.println(new String(bytes));
     }
     
     
@@ -54,9 +55,19 @@ public class SocketChannel extends Channel {
             in.close();
             super.close();
         }
-        catch (Exception ex) {
+        catch (IOException ex) {
             throw new ChannelException(ex);
         }
+    }
+    
+    
+    public String getHost() {
+        return host;
+    }
+    
+    
+    public int getPort() {
+        return port;
     }
     
     
@@ -81,7 +92,8 @@ public class SocketChannel extends Channel {
                         notifyListeners(bytes);
                     }
                 }
-                catch (Exception ex) {
+                catch (IOException ex) {
+                    Logger.getLogger(SocketChannel.class.getName()).log(Level.WARNING, Receiver.class.getName(), ex);
                     running = false;
                 }
             }

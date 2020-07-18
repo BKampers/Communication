@@ -1,22 +1,51 @@
 package communication.swing;
 
 
+import bka.communication.*;
+import bka.swing.*;
+import gnu.io.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.util.*;
 import java.io.*;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.logging.*;
 import javax.swing.*;
 import javax.swing.event.*;
-import gnu.io.*;
-import java.util.logging.*;
+import org.json.*;
 
 
-public class MonitorConsole extends JFrame {
+public class MonitorConsole extends FrameApplication {
+    
     
     public MonitorConsole() {
+        initComponents();
+        initMenus();
+        findPorts();
+        for (int baudRate : getBaudRates()) {
+            baudComboBox.addItem(baudRate);
+        }
+        initListeners();
+    }
+
+  
+    private int[] getBaudRates() {
+        JSONArray configurationRates = getConfigurationArray("baud_rates");
+        if (configurationRates == null) {
+            return DEFAULT_BAUD_RATES;
+        }
+        int[] baudRates = new int[configurationRates.length()];
+        for (int i = 0; i < configurationRates.length(); ++i) {
+            baudRates[i] = configurationRates.optInt(i);
+        }
+        return baudRates;
+    }
+
+
+    private void initComponents() {
         getContentPane().setLayout(new BorderLayout());
-        setBackground(java.awt.Color.white);
-        setSize(600, 500);
+        setBackground(java.awt.Color.WHITE);
         JPanel sendPanel = new JPanel();
         sendText.setPreferredSize(new Dimension(430, 25));
         sendPanel.add(sendText);
@@ -34,9 +63,9 @@ public class MonitorConsole extends JFrame {
         receivePane.getViewport().add(receivedText);
         getContentPane().add(receivePane, BorderLayout.CENTER);
         JPanel choicePanel = new JPanel();
-        portComboBox.setPreferredSize(new Dimension(75, 25));
+        portComboBox.setPreferredSize(new Dimension(225, 25));
         choicePanel.add(portComboBox, BorderLayout.NORTH);
-        baudComboBox.setPreferredSize(new Dimension(75, 25));
+        baudComboBox.setPreferredSize(new Dimension(100, 25));
         choicePanel.add(baudComboBox);
         textJRadioButton = new JRadioButton("Text", true);
         byteJRadioButton = new JRadioButton("Byte", false);
@@ -45,9 +74,13 @@ public class MonitorConsole extends JFrame {
         buttonGroup.add(byteJRadioButton);
         choicePanel.add(textJRadioButton);
         choicePanel.add(byteJRadioButton);
-        getContentPane().add(choicePanel, BorderLayout.NORTH); 
+        getContentPane().add(choicePanel, BorderLayout.NORTH);
         setTitle("COM Monitor");
+        pack();
+    }
 
+
+    private void initMenus() {
         fileMenu.setText("File");
         fileMenu.add(newMenuItem);
         newMenuItem.setEnabled(false);
@@ -62,8 +95,7 @@ public class MonitorConsole extends JFrame {
         fileMenu.add(saveAsMenuItem);
         saveAsMenuItem.setEnabled(false);
         saveAsMenuItem.setText("Save As...");
-        fileMenu.add(separatorMenuItem);
-        separatorMenuItem.setText("-");
+        fileMenu.addSeparator();
         fileMenu.add(exitMenuItem);
         exitMenuItem.setText("Exit");
         mainMenuBar.add(fileMenu);
@@ -80,81 +112,83 @@ public class MonitorConsole extends JFrame {
         pasteMenuItem.setEnabled(false);
         pasteMenuItem.setText("Paste");
         pasteMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.CTRL_MASK));
-        mainMenuBar.add(editMenu);
-
+        mainMenuBar.add(editMenu);     
         setJMenuBar(mainMenuBar);
-
-        MonitorWindowAdapter aSymWindow = new MonitorWindowAdapter();
-        this.addWindowListener(aSymWindow);
-        ComponentActionListener lSymAction = new ComponentActionListener();
-        openMenuItem.addActionListener(lSymAction);
-        exitMenuItem.addActionListener(lSymAction);
-        ComboBoxItemListener lSymItem = new ComboBoxItemListener();
-        portComboBox.addItemListener(lSymItem);
-        sendButton.addActionListener(lSymAction);
-        sendText.addActionListener(lSymAction);
-        saveMenuItem.addActionListener(lSymAction);
-        baudComboBox.addItemListener(lSymItem);
-        textJRadioButton.addItemListener(lSymItem);
-        byteJRadioButton.addItemListener(lSymItem);
-
-        findPorts();
-        baudComboBox.addItem("115200");
-        baudComboBox.addItem("57600");
-        baudComboBox.addItem("38400");
-        baudComboBox.addItem("19200");
-        baudComboBox.addItem("9600");
-        baudComboBox.addItem("4800");
-        baudComboBox.addItem("2400");
-        baudComboBox.addItem("1200");
-        
-        pack();
     }
 
-    
-    public MonitorConsole(String title) {
-        this();
-        setTitle(title);
+ 
+    private void initListeners() {
+        setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+        addWindowListener(new MonitorWindowAdapter());
+        ComponentActionListener actionListener = new ComponentActionListener();
+        sendButton.addActionListener(actionListener);
+        sendText.addActionListener(actionListener);
+        saveMenuItem.addActionListener(actionListener);
+        openMenuItem.addActionListener(actionListener);
+        exitMenuItem.addActionListener(actionListener);
+        ComponentItemListener itemListener = new ComponentItemListener();
+        portComboBox.addItemListener(itemListener);
+        baudComboBox.addItemListener(itemListener);
+        textJRadioButton.addItemListener(itemListener);
+        byteJRadioButton.addItemListener(itemListener);
     }
 
 
-    static public void main(String args[]) {
+    public static void main(String args[]) {
         try {
-            (new MonitorConsole()).setVisible(true);
+            MonitorConsole console = new MonitorConsole();
+            console.parseArguments(args);
+            String baud = console.getProperty(BAUD_PROPERTY_KEY);
+            if (baud != null) {
+                console.baudComboBox.setSelectedItem(Integer.parseInt(console.getProperty(BAUD_PROPERTY_KEY)));
+            }
+            console.portComboBox.setSelectedItem(console.getProperty(PORT_PROPERTY_KEY));
+            console.setVisible(true);
         }
-        catch (Throwable t) {
-            Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "main", t);
+        catch (NumberFormatException ex) {
+            getLogger().log(Level.SEVERE, "main", ex);
             System.exit(1);
         }
     }
 
     
     @Override
+    public String manufacturerName() {
+        return "Bka";
+    }
+
+    
+    @Override
+    public String applicationName() {
+        return "Monitor Console";
+    }
+
+    
+   @Override
     public void setVisible(boolean visible) {
-        if (visible) {
-            setLocation(50, 50);
-        }	
         super.setVisible(visible);
     }
 
 
     @Override
     public void addNotify() {
-        // Record the size of the window prior to calling parents addNotify.
-        Dimension dimension = getSize();
+        Dimension size = getSize(); // Record the size of the window prior to calling parent's addNotify.
         super.addNotify();
-        if (componentsAdjusted) {
-            return;
+        if (! componentsAdjusted) {
+            adjustToInsets(size);
+            componentsAdjusted = true;
         }
-        // Adjust components according to the insets
-        setSize(getInsets().left + getInsets().right + dimension.width, getInsets().top + getInsets().bottom + dimension.height);
-        Component components[] = getComponents();
-        for (Component component : components) {
-            Point point = component.getLocation();
-            point.translate(getInsets().left, getInsets().top);
-            component.setLocation(point);
+    }
+
+
+    private void adjustToInsets(Dimension dimension) {
+        Insets insets = getInsets();
+        setSize(insets.left + insets.right + dimension.width, insets.top + insets.bottom + dimension.height);
+        for (Component component : getComponents()) {
+            Point location = component.getLocation();
+            location.translate(insets.left, insets.top);
+            component.setLocation(location);
         }
-        componentsAdjusted = true;
     }
 
     
@@ -177,7 +211,7 @@ public class MonitorConsole extends JFrame {
     }
 
 
-    private void saveMenuItem_actionPerformed(ActionEvent event) {
+    private void saveMenuItem_actionPerformed(ActionEvent evt) {
         JFileChooser fileChooser = createFileChooser();
         fileChooser.setDialogType(JFileChooser.SAVE_DIALOG);
         fileChooser.showSaveDialog(this);
@@ -195,82 +229,88 @@ public class MonitorConsole extends JFrame {
     }
 
 
-    private void exitMenuItem_actionPerformed(ActionEvent event) {
+    private void exitMenuItem_actionPerformed(ActionEvent evt) {
         System.exit(0);
     }
 
 
-    private void portComboBox_itemStateChanged(ItemEvent event) {
-        String selected = (String) event.getItem();
-        if (event.getStateChange() == ItemEvent.SELECTED) {
-            if (! selected.equals("-")) {
-                openSerialPort((CommPortIdentifier) tableOfPorts.get(selected));
-            }
-            else {
-                openSerialPort(null);
-            }
+    private void portComboBox_itemStateChanged(ItemEvent evt) {
+        String selected = (String) evt.getItem();
+        setProperty(PORT_PROPERTY_KEY, selected);
+        if (! NO_SELECTION.equals(selected)) {
+            openSerialPort((CommPortIdentifier) tableOfPorts.get(selected));
+        }
+        else {
+            openSerialPort(null);
         }
     }
 
 
-    private void baudComboBox_itemStateChanged(ItemEvent event) {
+    private void baudComboBox_itemStateChanged(ItemEvent evt) {
         if (serialPort != null) {
+            setProperty(BAUD_PROPERTY_KEY, evt.getItem().toString());
             setSerialPortParams();
         }
     }
 
 
-    private void sendButton_actionPerformed(ActionEvent event) {
+    private void sendButton_actionPerformed(ActionEvent evt) {
         transmitText(sendText.getText());
     }
 
 
-    private void sendText_actionPerformed(ActionEvent event) {
+    private void sendText_actionPerformed(ActionEvent evt) {
         transmitText(sendText.getText());
     }
 
     
     private void openSerialPort(CommPortIdentifier commPortIdentifier) {
-        if (openedPort != null) {
+        if (openedPort != null && serialPort != null) {
             serialPort.close();
         }
         if (commPortIdentifier != null) {
             try {
-                serialPort = (SerialPort) commPortIdentifier.open("MonitorConsole", 2000);
+                serialPort = (SerialPort) commPortIdentifier.open(MonitorConsole.class.getName(), 2000);
             } 
-            catch (PortInUseException e) {
+            catch (PortInUseException ex) {
                 serialPort = null;
-                System.out.println(e);
+                logOpenPortException(commPortIdentifier, ex);
             }
             if (serialPort != null) {
                 try {
                     outputStream = serialPort.getOutputStream();
                     inputStream = serialPort.getInputStream();
                 } 
-                catch (IOException e) {
-                    System.out.println(e);
+                catch (IOException ex) {
+                    logOpenPortException(commPortIdentifier, ex);
                 }
                 setSerialPortParams();
-            }
-            serialPort.notifyOnDataAvailable(true);
-            try {
-                serialPort.addEventListener(new CommPortListener());
-            }
-            catch (TooManyListenersException e) {
-                    System.out.println(e);
+                serialPort.notifyOnDataAvailable(true);
+                try {
+                    serialPort.addEventListener(new CommPortListener());
+                }
+                catch (TooManyListenersException ex) {
+                    logOpenPortException(commPortIdentifier, ex);
+                }
+                openedPort = commPortIdentifier;
             }
         }
-        openedPort = commPortIdentifier;
+    }
+
+
+    private void logOpenPortException(CommPortIdentifier commPortIdentifier, Exception exception) {
+        getLogger().log(Level.SEVERE, "Open port " + commPortIdentifier.getName(), exception);
     }
 
 
     private void findPorts() {
-        portComboBox.addItem("-");
+        String portFilter = getConfigurationString("port_filter");
+        portComboBox.addItem(NO_SELECTION);
         Enumeration portList = CommPortIdentifier.getPortIdentifiers();
         while (portList.hasMoreElements()) {
             CommPortIdentifier portId = (CommPortIdentifier) portList.nextElement();
             String name = portId.getName();
-            if (name.substring(0, 3).equals("COM")) {
+            if (portFilter == null || name.matches(portFilter)) {
                 tableOfPorts.put(name, portId);
                 portComboBox.addItem(name);
             }
@@ -280,30 +320,29 @@ public class MonitorConsole extends JFrame {
 
     private void transmitText(String text) {
         if (byteJRadioButton.isSelected()) {
-            boolean ready = false;
-            Scanner scanner = new Scanner(text);
-            while (! ready) {
-                try {
-                    outputStream.write(scanner.nextInt());
-                }
-                catch (NoSuchElementException e) {
-                    ready = true;
-                }
-                catch (IOException e) {
-                    JOptionPane.showMessageDialog(this, e.toString(), "Port error", JOptionPane.ERROR_MESSAGE);
-                    ready = true;
-                }
-            }
+            transmitBytes(text);
         }
         else {
             try {
-                text += CR;
-                outputStream.write(text.getBytes());
+                outputStream.write((text + CR).getBytes());
                 sendText.setText("");
             }
-            catch (Throwable t) {
-                System.out.println(t);
-                JOptionPane.showMessageDialog(this, t.toString(), "Port error", JOptionPane.ERROR_MESSAGE); 
+            catch (IOException ex) {
+                getLogger().log(Level.WARNING, "transmit", ex);
+                JOptionPane.showMessageDialog(this, ex.toString(), "Port error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void transmitBytes(String text) {
+        Scanner scanner = new Scanner(text);
+        while (scanner.hasNextInt()) {
+            try {
+                outputStream.write(scanner.nextInt());
+            }
+            catch (NoSuchElementException | IOException ex) {
+                getLogger().log(Level.WARNING, "Scanning", ex);
+                JOptionPane.showMessageDialog(this, ex.toString(), "Transmit error", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
@@ -318,7 +357,7 @@ public class MonitorConsole extends JFrame {
                 SerialPort.PARITY_NONE);
         } 
         catch (NumberFormatException | UnsupportedCommOperationException ex) {
-            Logger.getLogger(MonitorConsole.class.getName()).log(Level.SEVERE, "setSerialPortParams", ex);
+            getLogger().log(Level.SEVERE, "Set serial port params", ex);
         }
     }
     
@@ -331,6 +370,11 @@ public class MonitorConsole extends JFrame {
         }
         return fileChooser;
         
+    }
+
+
+    private static Logger getLogger() {
+        return Logger.getLogger(MonitorConsole.class.getName());
     }
 
 
@@ -351,28 +395,89 @@ public class MonitorConsole extends JFrame {
     
     private class MonitorWindowAdapter extends WindowAdapter
     {
+
         @Override
-        public void windowClosing(java.awt.event.WindowEvent event) {
-            Object object = event.getSource();
-            if (object == MonitorConsole.this) {
-                System.exit(0);
+        public void windowOpened(WindowEvent evt) {
+            loadPlugins();
+            for (Task task : tasks) {
+                openPluginPanel(task.getPlugin().getView());
+                task.start();
             }
         }
+
+        private void openPluginPanel(JPanel panel) {
+            if (panel != null) {
+                JDialog dialog = new CustomDialog(MonitorConsole.this, panel.getName(), panel, false);
+                Dimension d = panel.getPreferredSize();
+                dialog.setPreferredSize(panel.getPreferredSize());
+                dialog.getContentPane().add(panel);
+                dialog.pack();
+                dialog.setVisible(true);
+            }
+        }
+
+        private void loadPlugins() {
+            JSONArray pluginClassNames = getConfigurationArray("plugins");
+            if (pluginClassNames != null) {
+                URLClassLoader classLoader = new URLClassLoader(loadCLassUrls());
+                for (int i = 0; i < pluginClassNames.length(); ++i) {
+                    try {
+                        String name = pluginClassNames.getString(i);
+                        Class pluginClass = classLoader.loadClass(name);
+                        Plugin plugin = (Plugin) pluginClass.newInstance();
+                        tasks.add(new Task(plugin));
+                    }
+                    catch (JSONException | ReflectiveOperationException ex) {
+                        Logger.getLogger(MonitorConsole.class.getName()).log(Level.WARNING, "Configuration", ex);
+                    }
+                }
+            }
+        }
+
+        private URL[] loadCLassUrls() {
+            JSONArray pluginPaths = getConfigurationArray("plugin-paths");
+            if (pluginPaths == null) {
+                return null;
+            }
+            URL[] classUrls = new URL[pluginPaths.length()];
+            for (int i = 0; i < pluginPaths.length(); ++i) {
+                try {
+                    classUrls[i] = new URL(pluginPaths.getString(i));
+                }
+                catch (JSONException | MalformedURLException ex) {
+                    Logger.getLogger(MonitorConsole.class.getName()).log(Level.WARNING, "Configuration", ex);
+                }
+            }
+            return classUrls;
+        }
+
+        @Override
+        public void windowClosing(WindowEvent evt) {
+            for (Window window : getOwnedWindows()) {
+                if (window instanceof AbstractDialog) {
+                    window.dispose();
+                }
+            }
+            AbstractDialog.store(MonitorConsole.this);
+        }
+
     }
 
 
-    private class ComboBoxItemListener implements ItemListener {
+    private class ComponentItemListener implements ItemListener {
         
         @Override
         public void itemStateChanged(ItemEvent event) {
-            Object object = event.getSource();
-            if (object == portComboBox) {
-                portComboBox_itemStateChanged(event);
+            if (event.getStateChange() == ItemEvent.SELECTED) {
+                Object object = event.getSource();
+                if (object == portComboBox) {
+                    portComboBox_itemStateChanged(event);
+                }
+                else if (object == baudComboBox) {
+                    baudComboBox_itemStateChanged(event);
+                }
+                sendText.requestFocus();
             }
-            else if (object == baudComboBox) {
-                baudComboBox_itemStateChanged(event);
-            }
-            sendText.requestFocus();
         }
         
     }
@@ -407,11 +512,10 @@ public class MonitorConsole extends JFrame {
     private class ScrollChangeListener implements ChangeListener {
         
         @Override
-        public void stateChanged(ChangeEvent e) {
-            // Test for flag. Otherwise, if we scroll unconditionally, 
-            // the scroll bar will be stuck at the bottom even when the 
-            // user tries to drag it. So we only scroll when we know 
-            // we've added text
+        public void stateChanged(ChangeEvent evt) {
+            // Test for flag. When scrolling unconditionally,
+            // the scroll bar will get stuck at the bottom even when the
+            // user tries to drag it. So only scroll when text was added.
             if (shouldScroll) {
                 JScrollBar vertBar = receivePane.getVerticalScrollBar();
                 vertBar.setValue(vertBar.getMaximum());
@@ -425,41 +529,85 @@ public class MonitorConsole extends JFrame {
     private class CommPortListener implements SerialPortEventListener  {
         
         @Override
-        public void serialEvent(SerialPortEvent ev) {
-            if (ev.getEventType() == SerialPortEvent.DATA_AVAILABLE) {
+        public void serialEvent(SerialPortEvent evt) {
+            if (evt.getEventType() == SerialPortEvent.DATA_AVAILABLE) {
                 try {
-                    int available = inputStream.available();
-                    byte[] receiveBuffer = new byte[available];
-                    inputStream.read(receiveBuffer, 0, receiveBuffer.length);
-                    String received;
+                    final int receiveCount = inputStream.available();
+                    byte[] receiveBuffer = new byte[receiveCount];
+                    inputStream.read(receiveBuffer, 0, receiveCount);
+                    StringBuilder received = new StringBuilder();
                     if (byteJRadioButton.isSelected()) {
-                        received = "";
-                        for (int i = 0; i < available; i++) {
-                            received += Byte.toString(receiveBuffer[i]) + ' ';
+                        for (int i = 0; i < receiveCount; ++i) {
+                            received.append(Byte.toString(receiveBuffer[i]));
+                            received.append(' ');
                         }
-                        received += CR;
+                        received.append(CR);
                     }
                     else {
-                        received = new String(receiveBuffer);
+                        received.append(new String(receiveBuffer));
                     }
-                    receivedText.append(received);
+                    receivedText.append(received.toString());
                     if (receivedText.getText().length() > 50000) {
                         receivedText.replaceRange("", 0, 1000);
                     }
                     shouldScroll = true;
+                    for (Task task : tasks) {
+                        task.notify(Arrays.copyOf(receiveBuffer, receiveCount));
+                    }
                 }
-                catch (IOException e) {
-                    System.out.println(e);
+                catch (IOException ex) {
+                    getLogger().log(Level.WARNING, evt.toString(), ex);
                 }
             }
         }
 
     }
-    
-    
-    // Used for addNotify check.
-    private boolean componentsAdjusted = false;
 
+
+    private class Task {
+
+        Task(Plugin plugin) {
+            this.plugin = plugin;
+        }
+
+        void start() {
+            thread = new Thread(new Runnable() {
+                @Override // TODO use lambda when sure Java 8 can be used
+                public void run() {
+                    runTask();
+                }
+            }, "Monitor Console plugin");
+            thread.start();
+        }
+
+        private void runTask() {
+            while (true) {
+                try {
+                    plugin.receive(receiveQueue.take());
+                    plugin.updateView();
+                }
+                catch (InterruptedException | RuntimeException ex) {
+                    getLogger().log(Level.WARNING, plugin.getClass().getName(), ex);
+                }
+            }
+        }
+
+        Plugin getPlugin() {
+            return plugin;
+        }
+
+        void notify(byte[] data) {
+            receiveQueue.add(data);
+        }
+
+        private final Plugin plugin;
+        private final BlockingQueue<byte[]> receiveQueue = new LinkedBlockingQueue<>();
+        private Thread thread;
+
+    }
+
+
+    private boolean componentsAdjusted = false; // used by addNotify
     private final JTextField sendText = new JTextField();
     private final JTextArea receivedText = new JTextArea();
     private final JButton sendButton = new JButton();
@@ -472,7 +620,6 @@ public class MonitorConsole extends JFrame {
     private final JMenuItem openMenuItem = new JMenuItem();
     private final JMenuItem saveMenuItem = new JMenuItem();
     private final JMenuItem saveAsMenuItem = new JMenuItem();
-    private final JMenuItem separatorMenuItem = new JMenuItem();
     private final JMenuItem exitMenuItem = new JMenuItem();
     private final JMenu editMenu = new JMenu();
     private final JMenuItem cutMenuItem = new JMenuItem();
@@ -485,17 +632,24 @@ public class MonitorConsole extends JFrame {
     private JRadioButton textJRadioButton;
     private JRadioButton byteJRadioButton;
     
-    private CommPortIdentifier openedPort = null;
+    private CommPortIdentifier openedPort;
     private SerialPort serialPort;
     private OutputStream outputStream;
     private InputStream inputStream;
 
     private final Map<String, CommPortIdentifier> tableOfPorts = new HashMap<>();
+    private final Collection<Task> tasks = new ArrayList<>();
 
     private boolean shouldScroll = false;
-    
+
     
     private static final String CR = "\n\r";
 
-}
+    private static final String PORT_PROPERTY_KEY = "port";
+    private static final String BAUD_PROPERTY_KEY = "baud";
+    
+    private static final String NO_SELECTION = "-";
+    
+    private static final int[] DEFAULT_BAUD_RATES = { 115200, 19200, 9600, 4800 };
 
+}
